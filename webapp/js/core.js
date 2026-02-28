@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   KRYPTAN ACADEMY — Core JS Logic
+   CRZPTO INTELLIGENCE ACADEMY — Core JS Logic
    Progress, Navigation, TG WebApp integration
    ═══════════════════════════════════════════════ */
 
