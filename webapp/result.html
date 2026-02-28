@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Вердикт Академии — Crypto Intelligence Academy</title>
+  <title>Вердикт Академии — Kryptan Academy</title>
   <link rel="stylesheet" href="css/kryptan.css">
   <style>
     .result-block { display: none; }
@@ -117,7 +117,7 @@
     <div class="result-header">
       <div class="ka-logo" style="justify-content:center;margin-bottom:16px;">
         <div class="ka-logo-icon">K</div>
-        <span class="ka-logo-text">Crypto Intelligence Academy</span>
+        <span class="ka-logo-text">Kryptan Academy</span>
       </div>
       <h1 class="result-title">Твои результаты</h1>
       <p class="result-subtitle">Отборочное тестирование завершено</p>
@@ -304,17 +304,34 @@ async function submitResults() {
 
   var patternNum = calcPattern(p);
 
-  // Получаем user_id из Telegram WebApp (если доступен)
+  // Получаем данные пользователя из Telegram WebApp
+  var tgWebApp = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   var tgUser = null;
-  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-    tgUser = window.Telegram.WebApp.initDataUnsafe.user || null;
+
+  // Способ 1: initDataUnsafe.user (работает в большинстве случаев)
+  if (tgWebApp && tgWebApp.initDataUnsafe && tgWebApp.initDataUnsafe.user) {
+    tgUser = tgWebApp.initDataUnsafe.user;
   }
 
-  var userName = tgUser
-    ? ((tgUser.first_name || '') + ' ' + (tgUser.last_name || '')).trim() + (tgUser.username ? ' (@' + tgUser.username + ')' : '')
-    : 'Неизвестный кандидат';
+  // Способ 2: парсим initData вручную если initDataUnsafe пустой
+  if (!tgUser && tgWebApp && tgWebApp.initData && tgWebApp.initData.length > 0) {
+    try {
+      var params = new URLSearchParams(tgWebApp.initData);
+      var userParam = params.get('user');
+      if (userParam) {
+        tgUser = JSON.parse(decodeURIComponent(userParam));
+      }
+    } catch(e) { console.warn('initData parse error:', e); }
+  }
 
-  var userId = tgUser ? tgUser.id : '—';
+  // Собираем имя и username
+  var firstName  = (tgUser && tgUser.first_name) || '';
+  var lastName   = (tgUser && tgUser.last_name)  || '';
+  var username   = (tgUser && tgUser.username)   || '';
+  var userId     = (tgUser && tgUser.id)         || '';
+
+  var fullName = (firstName + ' ' + lastName).trim() || 'Неизвестный кандидат';
+  var userLink = username ? '@' + username : (userId ? 'ID: ' + userId : 'нет username');
 
   // Формируем читаемое сообщение для чата
   var patternLabel = PATTERN_LABELS[patternNum] || ('Паттерн ' + patternNum);
@@ -334,10 +351,10 @@ async function submitResults() {
     : '—';
 
   var text = [
-    '🆕 НОВАЯ ЗАЯВКА — CI ACADEMY',
+    '🆕 НОВАЯ ЗАЯВКА — KRYPTAN ACADEMY',
     '━━━━━━━━━━━━━━━━━━━━━━',
-    '👤 ' + userName,
-    '🆔 ID: ' + userId,
+    '👤 ' + fullName + '  ' + userLink,
+    '🆔 ID: ' + (userId || '—'),
     '',
     '━━━━━━━━━━━━━━━━━━━━━━',
     patternLabel,
