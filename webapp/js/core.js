@@ -16,11 +16,11 @@ if (tg) {
 
 // ── Constants ──
 const TESTS = [
-  { key: 'holland',       title: 'Голланда',      emoji: '🎯', url: 'tests/holland.html' },
-  { key: 'gambling',      title: 'Игромания',      emoji: '🎲', url: 'tests/gambling.html' },
-  { key: 'hardiness',     title: 'Жизнестойкость', emoji: '🛡️', url: 'tests/hardiness.html' },
-  { key: 'proforientation', title: 'Профориент.', emoji: '🔭', url: 'tests/proforientation.html' },
-  { key: 'tolerance',     title: 'Толерантность',  emoji: '⚖️', url: 'tests/tolerance.html' },
+  { key: 'holland',       title: 'Голланда',      emoji: '🎯', url: 'holland.html' },
+  { key: 'gambling',      title: 'Игромания',      emoji: '🎲', url: 'gambling.html' },
+  { key: 'hardiness',     title: 'Жизнестойкость', emoji: '🛡️', url: 'hardiness.html' },
+  { key: 'proforientation', title: 'Профориент.', emoji: '🔭', url: 'proforientation.html' },
+  { key: 'tolerance',     title: 'Толерантность',  emoji: '⚖️', url: 'tolerance.html' },
 ];
 
 const STORAGE_KEY = 'ka_progress_v2';
