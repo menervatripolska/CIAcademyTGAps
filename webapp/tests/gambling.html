@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Склонность к азарту — Kryptan Academy</title>
+  <link rel="stylesheet" href="../css/kryptan.css">
+  <style>
+    .yn-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    #result-section { display: none; }
+    .risk-meter {
+      text-align: center;
+      padding: 32px 0;
+    }
+    .risk-num {
+      font-family: var(--font-title);
+      font-size: 5rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .risk-label {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div style="padding:20px 0 8px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button onclick="history.back()" class="btn btn-outline" style="padding:8px 14px;font-size:0.8rem;">← Назад</button>
+      <div style="flex:1;">
+        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+          <div id="qProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--neon-purple),var(--neon-green));transition:width 0.4s;"></div>
+        </div>
+      </div>
+      <span id="qProgressCount" style="font-family:var(--font-title);font-size:0.75rem;color:var(--neon-purple);">0/8</span>
+    </div>
+    <div class="neon-badge purple" style="margin-bottom:12px;">🎲 Тест 2 из 5</div>
+    <h1 style="font-family:var(--font-title);font-size:1.4rem;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;background:linear-gradient(135deg,#fff,var(--neon-violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">Склонность к азарту</h1>
+    <p style="font-family:var(--font-body);color:var(--text-muted);font-size:0.9rem;font-weight:500;">Оцени своё отношение к риску. 8 вопросов, честные ответы.</p>
+  </div>
+
+  <div id="quiz-container"></div>
+
+  <button class="btn btn-primary btn-full" id="calc-btn" onclick="calcGambling()" style="margin-top:16px;display:none;">
+    ⚡ Показать результат
+  </button>
+
+  <!-- Result -->
+  <div id="result-section">
+    <div class="chain-divider"><span class="chain-icon">◈ РЕЗУЛЬТАТ ◈</span></div>
+    <div class="ka-card">
+      <div class="risk-meter">
+        <div class="risk-num" id="risk-score"></div>
+        <div class="risk-label" id="risk-label"></div>
+      </div>
+      <div class="chain-divider" style="margin:8px 0 16px;"><span class="chain-icon">◇</span></div>
+      <div class="question-num">📊 Анализ</div>
+      <p id="risk-desc" style="font-family:var(--font-text);color:var(--text-secondary);font-size:0.95rem;line-height:1.7;"></p>
+      <div style="margin-top:16px;padding:12px 16px;background:rgba(155,48,255,0.06);border:1px solid var(--border-neon);border-radius:var(--radius-md);">
+        <p id="risk-rec" style="font-family:var(--font-body);color:var(--text-primary);font-size:0.9rem;line-height:1.6;font-weight:500;"></p>
+      </div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="finishTest()">
+      ✅ Перейти к следующему тесту
+    </button>
+  </div>
+
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const questions = [
+  "Случалось ли вам лгать близким, чтобы скрыть истинную степень вашего увлечения игрой?",
+  "Чувствуете ли вы необходимость играть на более крупные суммы, чтобы получить ту же остроту ощущений?",
+  "Делали ли вы неоднократные, но безуспешные попытки контролировать, сократить или прекратить игру?",
+  "Возвращались ли вы к игре на следующий день после проигрыша, чтобы «отыграться»?",
+  "Использовали ли вы игру как способ уйти от личных проблем или облегчить чувство вины/тревоги?",
+  "Рисковали ли вы важными отношениями, работой или возможностями карьерного роста из-за игры?",
+  "Полагались ли вы на других лиц в поиске денег, чтобы облегчить отчаянное финансовое положение, вызванное игрой?",
+  "Чувствуете ли вы сильную поглощённость игрой (постоянные мысли о прошлых играх или планирование следующих)?",
+];
+
+const levels = [
+  {min:0,max:0,label:"Низкий риск",color:"var(--neon-green)",
+   desc:"Признаков игровой зависимости не обнаружено. Ты относишься к азарту зрело и без деструктивных паттернов.",
+   rec:"Продолжай контролировать риски. На крипто-рынке важно сохранять это хладнокровие."},
+  {min:1,max:3,label:"Средний риск",color:"var(--neon-gold)",
+   desc:"Проявляются первые маркеры склонности к азарту. Пограничное состояние, требующее осознанности.",
+   rec:"Установи жёсткие лимиты на сделки. Изучи правила риск-менеджмента до начала торговли."},
+  {min:4,max:5,label:"Высокий риск",color:"#ff9800",
+   desc:"Высокая склонность к азарту. Крипто-рынок будет провоцировать импульсивные решения.",
+   rec:"Обязательно пройди курс по психологии трейдинга. Торговля без дисциплины — прямой путь к убыткам."},
+  {min:6,max:8,label:"Критический риск",color:"#ff5252",
+   desc:"Выраженные признаки патологической зависимости от азарта. Крипто-рынок категорически противопоказан без работы со специалистом.",
+   rec:"Академия рекомендует проконсультироваться с психологом перед началом любой торговой деятельности."},
+];
+
+let answers = {};
+
+const container = document.getElementById('quiz-container');
+questions.forEach((q, i) => {
+  const div = document.createElement('div');
+  div.className = 'ka-card';
+  div.style.marginBottom = '12px';
+  div.innerHTML = `
+    <div class="question-num">Вопрос ${i+1} из 8</div>
+    <div class="question-text">${q}</div>
+    <div class="yn-options">
+      <button class="option-btn" onclick="selectYN(${i},1,this)">Да</button>
+      <button class="option-btn" onclick="selectYN(${i},0,this)">Нет</button>
+    </div>`;
+  container.appendChild(div);
+});
+
+function selectYN(idx, val, btn) {
+  const card = btn.closest('.ka-card');
+  card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  answers[idx] = val;
+  updateProgress();
+}
+
+function updateProgress() {
+  const done = Object.keys(answers).length;
+  const pct = done / questions.length * 100;
+  document.getElementById('qProgressFill').style.width = pct + '%';
+  document.getElementById('qProgressCount').textContent = `${done}/${questions.length}`;
+  document.getElementById('calc-btn').style.display = done >= questions.length ? 'flex' : 'none';
+}
+
+function calcGambling() {
+  if (Object.keys(answers).length < questions.length) {
+    showToast('Ответь на все вопросы!'); return;
+  }
+  const score = Object.values(answers).reduce((a,b) => a+b, 0);
+
+  document.getElementById('quiz-container').style.display = 'none';
+  document.getElementById('calc-btn').style.display = 'none';
+  document.getElementById('result-section').style.display = 'block';
+  window.scrollTo(0,0);
+
+  const level = levels.find(l => score >= l.min && score <= l.max);
+  const scoreEl = document.getElementById('risk-score');
+  scoreEl.textContent = `${score}/8`;
+  scoreEl.style.color = level.color;
+  scoreEl.style.textShadow = `0 0 30px ${level.color}88`;
+  document.getElementById('risk-label').textContent = level.label;
+  document.getElementById('risk-label').style.color = level.color;
+  document.getElementById('risk-desc').textContent = level.desc;
+  document.getElementById('risk-rec').textContent = level.rec;
+
+  Progress.saveTest('gambling', { score, level: level.label, color: level.color });
+}
+
+function finishTest() { goToNextTest(); }
+</script>
+</body>
+</html>

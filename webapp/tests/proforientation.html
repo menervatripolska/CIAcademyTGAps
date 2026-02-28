@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Профориентирование — Kryptan Academy</title>
+  <link rel="stylesheet" href="../css/kryptan.css">
+  <style>
+    .prof-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    .prof-title {
+      font-family: var(--font-title);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--neon-violet);
+      margin-bottom: 4px;
+    }
+    .prof-desc-text {
+      font-family: var(--font-text);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .selectors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sel-group label {
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .sel-group select {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-neon);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 500;
+      appearance: none;
+      cursor: pointer;
+    }
+    .sel-group select:focus {
+      outline: none;
+      border-color: var(--neon-purple);
+      box-shadow: 0 0 12px rgba(155,48,255,0.3);
+    }
+    .sel-group select option { background: #0f0f1a; color: var(--text-primary); }
+    #result-section { display: none; }
+    .res-sphere {
+      padding: 16px;
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
+      border: 1px solid var(--border-subtle);
+    }
+    .status-ideal { border-color: rgba(0,230,118,0.4); background: rgba(0,230,118,0.05); }
+    .status-learn  { border-color: rgba(255,215,64,0.4); background: rgba(255,215,64,0.04); }
+    .status-talent { border-color: rgba(0,229,255,0.4); background: rgba(0,229,255,0.04); }
+    .status-weak   { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+    .res-sphere .tag {
+      font-family: var(--font-title);
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+    .status-ideal .tag  { background: rgba(0,230,118,0.15); color: var(--neon-green); }
+    .status-learn .tag  { background: rgba(255,215,64,0.15); color: var(--neon-gold); }
+    .status-talent .tag { background: rgba(0,229,255,0.12); color: var(--neon-cyan); }
+    .status-weak .tag   { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div style="padding:20px 0 8px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button onclick="history.back()" class="btn btn-outline" style="padding:8px 14px;font-size:0.8rem;">← Назад</button>
+    </div>
+    <div class="neon-badge purple" style="margin-bottom:12px;">🔭 Тест 4 из 5</div>
+    <h1 style="font-family:var(--font-title);font-size:1.4rem;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;background:linear-gradient(135deg,#fff,var(--neon-violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">Профориентирование</h1>
+    <p style="font-family:var(--font-body);color:var(--text-muted);font-size:0.9rem;font-weight:500;">Оцени свой интерес и способности в каждой сфере.</p>
+    <div style="margin-top:10px;padding:10px 14px;background:rgba(155,48,255,0.06);border:1px solid var(--border-neon);border-radius:var(--radius-sm);">
+      <p style="font-family:var(--font-body);font-size:0.85rem;color:var(--text-secondary);">Матрица «Хочу × Могу» — выбери реальные оценки для каждой сферы</p>
+    </div>
+  </div>
+
+  <div id="quiz-container"></div>
+
+  <button class="btn btn-primary btn-full" onclick="calcProforientation()" style="margin-top:16px;">
+    ⚡ Показать профиль
+  </button>
+
+  <!-- Result -->
+  <div id="result-section">
+    <div class="chain-divider"><span class="chain-icon">◈ РЕЗУЛЬТАТ ◈</span></div>
+    <div class="ka-card">
+      <div class="question-num">🔭 Твой профессиональный профиль</div>
+      <div id="results-container"></div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="finishTest()">
+      ✅ Перейти к следующему тесту
+    </button>
+  </div>
+
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const spheres = [
+  { id:'art',   title:'Искусство и визуальные образы', desc:'Дизайн, режиссура, иллюстрация, работа с цветом и формой.' },
+  { id:'biz',   title:'Коммерция и предпринимательство', desc:'Организация, переговоры, управление рисками и людьми.' },
+  { id:'tech',  title:'Технические системы и IT', desc:'Код, алгоритмы, инженерия, работа с машинами.' },
+  { id:'logic', title:'Аналитика и знаковые системы', desc:'Цифры, данные, документы, поиск закономерностей.' },
+  { id:'human', title:'Гуманитарная сфера и тексты', desc:'Языки, тексты, психология, преподавание.' },
+  { id:'risk',  title:'Экстремальные практики', desc:'Риск, быстрая реакция, работа в неопределённости.' },
+];
+
+const container = document.getElementById('quiz-container');
+spheres.forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'prof-card';
+  div.innerHTML = `
+    <div class="prof-title">${s.title}</div>
+    <div class="prof-desc-text">${s.desc}</div>
+    <div class="selectors">
+      <div class="sel-group">
+        <label>Интерес (Хочу)</label>
+        <select id="int-${s.id}">
+          <option value="1">Низкий</option>
+          <option value="2">Средний</option>
+          <option value="3">Высокий</option>
+        </select>
+      </div>
+      <div class="sel-group">
+        <label>Способность (Могу)</label>
+        <select id="abl-${s.id}">
+          <option value="1">Слабая</option>
+          <option value="2">Средняя</option>
+          <option value="3">Высокая</option>
+        </select>
+      </div>
+    </div>`;
+  container.appendChild(div);
+});
+
+function calcProforientation() {
+  const results = [];
+  const container2 = document.getElementById('results-container');
+  container2.innerHTML = '';
+
+  spheres.forEach(s => {
+    const intVal = parseInt(document.getElementById(`int-${s.id}`).value);
+    const ablVal = parseInt(document.getElementById(`abl-${s.id}`).value);
+    let cls, tag, text;
+
+    if (intVal === 3 && ablVal === 3) {
+      cls = 'status-ideal'; tag = 'Приоритет';
+      text = 'Высокий интерес + талант. Приоритетная сфера для твоего развития.';
+    } else if (intVal === 3 && ablVal < 3) {
+      cls = 'status-learn'; tag = 'Обучение';
+      text = 'Высокий интерес при недостаточных навыках. Инвестируй в обучение.';
+    } else if (intVal < 3 && ablVal === 3) {
+      cls = 'status-talent'; tag = 'Скрытый талант';
+      text = 'Способности есть, но интерес не раскрыт. Стоит исследовать глубже.';
+    } else {
+      cls = 'status-weak'; tag = 'Не приоритет';
+      text = 'Низкий интерес и/или способности. Не ключевая зона развития.';
+    }
+
+    results.push({ id: s.id, title: s.title, intVal, ablVal, tag });
+
+    container2.innerHTML += `
+      <div class="res-sphere ${cls}">
+        <span class="tag">${tag}</span>
+        <div style="font-family:var(--font-body);font-weight:700;color:var(--text-primary);margin-bottom:4px;">${s.title}</div>
+        <div style="font-family:var(--font-text);font-size:0.85rem;color:var(--text-secondary);">${text}</div>
+        <div style="margin-top:8px;font-family:var(--font-title);font-size:0.7rem;color:var(--text-muted);">Интерес: ${intVal}/3 &nbsp;|&nbsp; Способности: ${ablVal}/3</div>
+      </div>`;
+  });
+
+  document.getElementById('quiz-container').style.display = 'none';
+  document.querySelector('.btn-primary').style.display = 'none';
+  document.getElementById('result-section').style.display = 'block';
+  window.scrollTo(0,0);
+
+  const top = results.filter(r => r.tag === 'Приоритет').map(r => r.title);
+  Progress.saveTest('proforientation', { results, topSpheres: top });
+}
+
+function finishTest() { goToNextTest(); }
+</script>
+</body>
+</html>

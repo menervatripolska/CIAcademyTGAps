@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Толерантность к неопределённости — Kryptan Academy</title>
+  <link rel="stylesheet" href="../css/kryptan.css">
+  <style>
+    #result-section { display: none; }
+    .tri-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .tri-card {
+      padding: 16px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid;
+      text-align: center;
+    }
+    .tri-card .tri-val {
+      font-family: var(--font-title);
+      font-size: 2rem;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .tri-card .tri-lbl {
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .tn-card  { border-color:rgba(0,229,255,0.35);  background:rgba(0,229,255,0.05); }
+    .itn-card { border-color:rgba(255,152,0,0.35);  background:rgba(255,152,0,0.04); }
+    .mitn-card{ border-color:rgba(155,48,255,0.35); background:rgba(155,48,255,0.06); }
+    .tn-card  .tri-val { color:var(--neon-cyan);  }
+    .itn-card .tri-val { color:#ff9800;  }
+    .mitn-card .tri-val { color:var(--neon-violet); }
+    .tn-card  .tri-lbl { color:var(--neon-cyan);  }
+    .itn-card .tri-lbl { color:#ff9800;  }
+    .mitn-card .tri-lbl { color:var(--neon-violet); }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div style="padding:20px 0 8px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button onclick="history.back()" class="btn btn-outline" style="padding:8px 14px;font-size:0.8rem;">← Назад</button>
+      <div style="flex:1;">
+        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+          <div id="qProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--neon-purple),var(--neon-green));transition:width 0.4s;"></div>
+        </div>
+      </div>
+      <span id="qProgressCount" style="font-family:var(--font-title);font-size:0.75rem;color:var(--neon-purple);">0/23</span>
+    </div>
+    <div class="neon-badge purple" style="margin-bottom:12px;">⚖️ Тест 5 из 5</div>
+    <h1 style="font-family:var(--font-title);font-size:1.3rem;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;background:linear-gradient(135deg,#fff,var(--neon-violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">Толерантность</h1>
+    <p style="font-family:var(--font-body);color:var(--text-muted);font-size:0.9rem;font-weight:500;">Отношение к неопределённости. 23 утверждения.</p>
+    <div style="margin-top:10px;padding:10px 14px;background:rgba(155,48,255,0.06);border:1px solid var(--border-neon);border-radius:var(--radius-sm);">
+      <p style="font-family:var(--font-body);font-size:0.85rem;color:var(--text-secondary);">
+        <strong style="color:var(--neon-violet);">1</strong> — Совсем не согласен&emsp;&emsp;
+        <strong style="color:var(--neon-violet);">7</strong> — Полностью согласен
+      </p>
+    </div>
+  </div>
+
+  <div id="quiz-container"></div>
+
+  <button class="btn btn-primary btn-full" id="calc-btn" onclick="calcTolerance()" style="margin-top:16px;display:none;">
+    ⚡ Показать результат
+  </button>
+
+  <!-- Result -->
+  <div id="result-section">
+    <div class="chain-divider"><span class="chain-icon">◈ РЕЗУЛЬТАТ ◈</span></div>
+    <div class="ka-card">
+      <div class="question-num">⚖️ Профиль толерантности к неопределённости</div>
+      <div class="tri-grid">
+        <div class="tri-card tn-card">
+          <div class="tri-val" id="res-tn"></div>
+          <div class="tri-lbl">ТН</div>
+        </div>
+        <div class="tri-card itn-card">
+          <div class="tri-val" id="res-itn"></div>
+          <div class="tri-lbl">ИТН</div>
+        </div>
+        <div class="tri-card mitn-card">
+          <div class="tri-val" id="res-mitn"></div>
+          <div class="tri-lbl">МИТН</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <p style="font-family:var(--font-body);font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;">ТН — Толерантность к новизне · ИТН — Стремление к ясности · МИТН — Межличностная определённость</p>
+
+        <div class="question-num" style="margin-bottom:8px;">🔵 Толерантность к новизне (ТН)</div>
+        <p id="desc-tn" style="font-family:var(--font-text);font-size:0.9rem;color:var(--text-secondary);line-height:1.6;margin-bottom:16px;"></p>
+
+        <div class="question-num" style="margin-bottom:8px;">🟠 Стремление к ясности (ИТН)</div>
+        <p id="desc-itn" style="font-family:var(--font-text);font-size:0.9rem;color:var(--text-secondary);line-height:1.6;margin-bottom:16px;"></p>
+
+        <div class="question-num" style="margin-bottom:8px;">🟣 Межличностная определённость (МИТН)</div>
+        <p id="desc-mitn" style="font-family:var(--font-text);font-size:0.9rem;color:var(--text-secondary);line-height:1.6;"></p>
+      </div>
+    </div>
+
+    <button class="btn btn-success btn-full" onclick="finishTest()">
+      🏆 Получить вердикт Академии
+    </button>
+  </div>
+
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const questions = [
+  "Я бы предпочёл жить в знакомой местности, чем путешествовать в новые места.",
+  "Мне не нравится, когда в разговоре затрагивают темы, в которых я не разбираюсь.",
+  "Я люблю знакомиться с людьми, чьи взгляды отличаются от моих собственных.",
+  "Для меня важно иметь чёткий распорядок дня.",
+  "Я чувствую дискомфорт, если не знаю, что со мной произойдёт завтра.",
+  "Хороший учитель — это тот, кто даёт однозначные ответы, а не заставляет сомневаться.",
+  "В любой проблеме всегда есть одно правильное решение.",
+  "Я получаю удовольствие от ситуаций, где исход непредсказуем.",
+  "Меня раздражают люди, чьё поведение нельзя предугадать.",
+  "Я стараюсь избегать ситуаций, в которых я не знаю, как себя вести.",
+  "Неопределённость в отношениях с близкими людьми для меня невыносима.",
+  "Я ценю искусство, которое заставляет меня задумываться, а не просто даёт ответы.",
+  "Мне трудно принимать решения, если у меня нет всей полноты информации.",
+  "Я предпочитаю планировать свой отпуск до мельчайших деталей.",
+  "Мир был бы лучше, если бы в нём было больше порядка и определённости.",
+  "Я легко адаптируюсь к изменениям, даже если они происходят внезапно.",
+  "Мне не нравятся двусмысленные ситуации, где нет чётких правил.",
+  "Я считаю, что неопределённость — это возможность для развития.",
+  "Люди, которые постоянно меняют своё мнение, вызывают у меня недоверие.",
+  "Я чувствую себя уверенно, даже когда не знаю, что принесёт будущее.",
+  "Я предпочитаю работать над задачами, которые имеют чёткое решение.",
+  "В отношениях с людьми ясность важнее, чем глубина.",
+  "Меня привлекают сложные задачи, в которых нет готового алгоритма решения.",
+];
+
+// Шкалы (1-based):
+// ТН: 3,8,12,16,18,20,23
+// ИТН: 1,4,5,7,10,13,14,15,17,21
+// МИТН: 2,6,9,11,19,22
+
+let answers = {};
+const container = document.getElementById('quiz-container');
+
+questions.forEach((q, i) => {
+  const div = document.createElement('div');
+  div.className = 'ka-card';
+  div.style.marginBottom = '12px';
+  div.style.padding = '16px 18px';
+  div.innerHTML = `
+    <div class="question-num">Утверждение ${i+1} из 23</div>
+    <div class="question-text" style="font-size:1rem;margin-bottom:14px;">${q}</div>
+    <div class="scale-options" style="justify-content:center;">
+      ${[1,2,3,4,5,6,7].map(v => `<button class="scale-btn" onclick="selectScale(${i},${v},this)" style="font-size:0.85rem;">${v}</button>`).join('')}
+    </div>
+    <div class="scale-labels" style="padding:0 4px;">
+      <span>Совсем не согласен</span>
+      <span>Полностью согласен</span>
+    </div>`;
+  container.appendChild(div);
+});
+
+function selectScale(idx, val, btn) {
+  const card = btn.closest('.ka-card');
+  card.querySelectorAll('.scale-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  answers[idx] = val;
+  updateProgress();
+}
+
+function updateProgress() {
+  const done = Object.keys(answers).length;
+  const pct = done / questions.length * 100;
+  document.getElementById('qProgressFill').style.width = pct + '%';
+  document.getElementById('qProgressCount').textContent = `${done}/${questions.length}`;
+  document.getElementById('calc-btn').style.display = done >= questions.length ? 'flex' : 'none';
+}
+
+function calcTolerance() {
+  if (Object.keys(answers).length < questions.length) {
+    showToast('Ответь на все утверждения!'); return;
+  }
+
+  let sc = { tn: 0, itn: 0, mitn: 0 };
+
+  for (let i = 0; i < 23; i++) {
+    const v = answers[i];
+    const n = i + 1;
+    if ([3,8,12,16,18,20,23].includes(n))         sc.tn   += v;
+    if ([1,4,5,7,10,13,14,15,17,21].includes(n))  sc.itn  += v;
+    if ([2,6,9,11,19,22].includes(n))              sc.mitn += v;
+  }
+
+  document.getElementById('quiz-container').style.display = 'none';
+  document.getElementById('calc-btn').style.display = 'none';
+  document.getElementById('result-section').style.display = 'block';
+  window.scrollTo(0,0);
+
+  document.getElementById('res-tn').textContent   = sc.tn;
+  document.getElementById('res-itn').textContent  = sc.itn;
+  document.getElementById('res-mitn').textContent = sc.mitn;
+
+  document.getElementById('desc-tn').textContent =
+    sc.tn > 35 ? 'Высокая. Ты открыт новому, не боишься хаоса и рассматриваешь неопределённость как ресурс. Крипто-рынок будет для тебя привычной средой.' :
+                  'Низкая. Склонность избегать перемен. Волатильность рынка будет создавать психологический дискомфорт.';
+
+  document.getElementById('desc-itn').textContent =
+    sc.itn > 50 ? 'Высокая интолерантность к неопределённости. Ты стремишься к чёткости и порядку. На рынке это может вызывать тревогу при отсутствии понятного сигнала.' :
+                   'Умеренная. Ты можешь работать с неполной информацией без чрезмерного стресса.';
+
+  document.getElementById('desc-mitn').textContent =
+    sc.mitn > 30 ? 'Высокая. Требование определённости в отношениях. В командной работе и при взаимодействии с рынком это может создавать напряжение.' :
+                    'Умеренная. Нормальный уровень потребности в ясности в межличностных отношениях.';
+
+  const tnLevel = sc.tn > 35 ? 'high' : 'low';
+  Progress.saveTest('tolerance', { tn: sc.tn, itn: sc.itn, mitn: sc.mitn, tnLevel });
+}
+
+function finishTest() { window.location.href = '../result.html'; }
+</script>
+</body>
+</html>

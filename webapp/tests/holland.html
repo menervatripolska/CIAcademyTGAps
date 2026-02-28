@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Тест Голланда — Kryptan Academy</title>
+  <link rel="stylesheet" href="../css/kryptan.css">
+  <style>
+    .pair-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 12px;
+      transition: border-color var(--transition);
+    }
+    .pair-card.answered { border-color: rgba(155,48,255,0.3); }
+    .pair-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    @media (max-width: 400px) {
+      .pair-options { grid-template-columns: 1fr; }
+    }
+    #result-section { display: none; }
+    .type-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .type-bar-label {
+      font-family: var(--font-title);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      min-width: 140px;
+      color: var(--text-secondary);
+    }
+    .type-bar-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .type-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 1s ease;
+    }
+    .type-bar-score {
+      font-family: var(--font-title);
+      font-size: 0.8rem;
+      color: var(--neon-violet);
+      min-width: 24px;
+      text-align: right;
+    }
+    .type-colors { R: '#ef4444', I: '#8b5cf6', A: '#ec4899', S: '#3b82f6', E: '#f59e0b', C: '#10b981' }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div style="padding:20px 0 8px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button onclick="history.back()" class="btn btn-outline" style="padding:8px 14px;font-size:0.8rem;">← Назад</button>
+      <div style="flex:1;">
+        <div id="qProgressBar" style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+          <div id="qProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--neon-purple),var(--neon-green));transition:width 0.4s ease;"></div>
+        </div>
+      </div>
+      <span id="qProgressCount" style="font-family:var(--font-title);font-size:0.75rem;color:var(--neon-purple);">0/42</span>
+    </div>
+
+    <div class="neon-badge purple" style="margin-bottom:12px;">🎯 Тест 1 из 5</div>
+    <h1 style="font-family:var(--font-title);font-size:1.4rem;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;background:linear-gradient(135deg,#fff,var(--neon-violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">Тест Голланда</h1>
+    <p style="font-family:var(--font-body);color:var(--text-muted);font-size:0.9rem;font-weight:500;">Выбери профессию, которая нравится больше. 42 пары.</p>
+  </div>
+
+  <div id="quiz-container"></div>
+
+  <button class="btn btn-primary btn-full" id="calc-btn" onclick="calcHolland()" style="margin-top:16px;display:none;">
+    ⚡ Показать результат
+  </button>
+
+  <!-- Result -->
+  <div id="result-section">
+    <div class="chain-divider"><span class="chain-icon">◈ РЕЗУЛЬТАТ ◈</span></div>
+
+    <div class="ka-card">
+      <div class="question-num">🎯 Профиль Голланда</div>
+      <div id="top-type" style="font-family:var(--font-title);font-size:1.6rem;font-weight:900;margin-bottom:4px;"></div>
+      <p id="top-desc" style="font-family:var(--font-text);color:var(--text-secondary);font-size:0.95rem;line-height:1.6;margin-bottom:20px;"></p>
+
+      <div class="question-num" style="margin-top:16px;">📊 Распределение типов</div>
+      <div id="type-bars"></div>
+    </div>
+
+    <button class="btn btn-success btn-full" id="next-btn" onclick="finishTest()">
+      ✅ Перейти к следующему тесту
+    </button>
+  </div>
+
+</div>
+
+<script src="../js/core.js"></script>
+<script>
+const pairs = [
+  {c1:"Инженер-механик",t1:"R",c2:"Инженер-проектировщик",t2:"I"},
+  {c1:"Врач-терапевт",t1:"S",c2:"Дизайнер одежды",t2:"A"},
+  {c1:"Бухгалтер",t1:"C",c2:"Менеджер по продажам",t2:"E"},
+  {c1:"Биолог-исследователь",t1:"I",c2:"Психолог",t2:"S"},
+  {c1:"Художник-оформитель",t1:"A",c2:"Программист",t2:"I"},
+  {c1:"Автомеханик",t1:"R",c2:"Секретарь-референт",t2:"C"},
+  {c1:"Адвокат",t1:"E",c2:"Редактор газеты",t2:"A"},
+  {c1:"Экономист",t1:"C",c2:"Биохимик",t2:"I"},
+  {c1:"Воспитатель",t1:"S",c2:"Предприниматель",t2:"E"},
+  {c1:"Радиотехник",t1:"R",c2:"Актер",t2:"A"},
+  {c1:"Математик",t1:"I",c2:"Архитектор",t2:"A"},
+  {c1:"Юрист",t1:"E",c2:"Чертежник",t2:"C"},
+  {c1:"Повар",t1:"R",c2:"Социолог",t2:"I"},
+  {c1:"Учитель",t1:"S",c2:"Фотограф",t2:"A"},
+  {c1:"Аудитор",t1:"C",c2:"Торговый представитель",t2:"E"},
+  {c1:"Слесарь-инструментальщик",t1:"R",c2:"Фармацевт",t2:"I"},
+  {c1:"Логопед",t1:"S",c2:"Журналист",t2:"A"},
+  {c1:"Финансовый директор",t1:"E",c2:"Библиотекарь",t2:"C"},
+  {c1:"Геолог",t1:"I",c2:"Музыкант",t2:"A"},
+  {c1:"Инженер по ТБ",t1:"R",c2:"Налоговый инспектор",t2:"C"},
+  {c1:"Спортивный тренер",t1:"S",c2:"Продюсер",t2:"E"},
+  {c1:"Физик-теоретик",t1:"I",c2:"Маклер",t2:"E"},
+  {c1:"Режиссер",t1:"A",c2:"Статистик",t2:"C"},
+  {c1:"Зоотехник",t1:"R",c2:"Биофизик",t2:"I"},
+  {c1:"Официант",t1:"S",c2:"Искусствовед",t2:"A"},
+  {c1:"Дипломат",t1:"E",c2:"Архивариус",t2:"C"},
+  {c1:"Эколог",t1:"I",c2:"Менеджер по персоналу",t2:"S"},
+  {c1:"Токарь",t1:"R",c2:"Писатель",t2:"A"},
+  {c1:"Священнослужитель",t1:"S",c2:"Нотариус",t2:"C"},
+  {c1:"Директор предприятия",t1:"E",c2:"Ученый-астроном",t2:"I"},
+  {c1:"Электрик",t1:"R",c2:"Ветеринар",t2:"S"},
+  {c1:"Провизор",t1:"I",c2:"Корректор",t2:"C"},
+  {c1:"Гид-переводчик",t1:"S",c2:"Рекламный агент",t2:"E"},
+  {c1:"Швея",t1:"R",c2:"Художник-модельер",t2:"A"},
+  {c1:"Археолог",t1:"I",c2:"Экскурсовод",t2:"S"},
+  {c1:"Оформитель витрин",t1:"A",c2:"Кассир",t2:"C"},
+  {c1:"Лаборант",t1:"I",c2:"Администратор",t2:"E"},
+  {c1:"Лесник",t1:"R",c2:"Скульптор",t2:"A"},
+  {c1:"Психиатр",t1:"I",c2:"Судья",t2:"E"},
+  {c1:"Фотокорреспондент",t1:"A",c2:"Программист-аналитик",t2:"C"},
+  {c1:"Фермер",t1:"R",c2:"Менеджер по маркетингу",t2:"E"},
+  {c1:"Библиограф",t1:"C",c2:"Врач-консультант",t2:"S"},
+];
+
+const interp = {
+  R:{name:"Реалистичный (R)",desc:"Практический склад. Работа с объектами, инструментами, техникой. Ценишь чёткость и материальный результат.",color:"#ef4444"},
+  I:{name:"Интеллектуальный (I)",desc:"Исследователь и аналитик. Наука, логика, теоретические основы. Ориентирован на познание.",color:"#8b5cf6"},
+  A:{name:"Артистичный (A)",desc:"Творческая натура. Самовыражение, эстетика, независимость. Не выносишь рутины и жёстких правил.",color:"#ec4899"},
+  S:{name:"Социальный (S)",desc:"Призвание — обучать, помогать, консультировать. Высокий уровень эмпатии и ориентация на людей.",color:"#3b82f6"},
+  E:{name:"Предпринимательский (E)",desc:"Лидер и организатор. Риск, влияние, управление. Коммерческий успех и достижение амбициозных целей.",color:"#f59e0b"},
+  C:{name:"Конвенциональный (C)",desc:"Система и порядок. Работа с данными, документами, цифрами. Ценишь стабильность и надёжность.",color:"#10b981"},
+};
+
+let answers = {};
+
+const container = document.getElementById('quiz-container');
+pairs.forEach((p, i) => {
+  const div = document.createElement('div');
+  div.className = 'pair-card';
+  div.id = `pair-${i}`;
+  div.innerHTML = `
+    <div class="question-num">Выбор ${i+1} из 42</div>
+    <div class="pair-options">
+      <button class="option-btn" onclick="selectPair(${i},'${p.t1}',this)">${p.c1}</button>
+      <button class="option-btn" onclick="selectPair(${i},'${p.t2}',this)">${p.c2}</button>
+    </div>`;
+  container.appendChild(div);
+});
+
+function selectPair(idx, type, btn) {
+  const card = document.getElementById(`pair-${idx}`);
+  card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  card.classList.add('answered');
+  answers[idx] = type;
+  updateProgress();
+}
+
+function updateProgress() {
+  const done = Object.keys(answers).length;
+  const pct = done / pairs.length * 100;
+  document.getElementById('qProgressFill').style.width = pct + '%';
+  document.getElementById('qProgressCount').textContent = `${done}/${pairs.length}`;
+  document.getElementById('calc-btn').style.display = done >= pairs.length ? 'flex' : 'none';
+}
+
+function calcHolland() {
+  if (Object.keys(answers).length < pairs.length) {
+    showToast('Ответь на все вопросы!'); return;
+  }
+  const scores = {R:0,I:0,A:0,S:0,E:0,C:0};
+  Object.values(answers).forEach(t => scores[t]++);
+
+  // Show result
+  document.getElementById('quiz-container').style.display = 'none';
+  document.getElementById('calc-btn').style.display = 'none';
+  document.getElementById('result-section').style.display = 'block';
+  window.scrollTo(0,0);
+
+  // Top type
+  const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const topKey = sorted[0][0];
+  const top = interp[topKey];
+  document.getElementById('top-type').textContent = top.name;
+  document.getElementById('top-type').style.color = top.color;
+  document.getElementById('top-desc').textContent = top.desc;
+
+  // Bars
+  const max = sorted[0][1] || 1;
+  const barsEl = document.getElementById('type-bars');
+  barsEl.innerHTML = sorted.map(([k,v]) => `
+    <div class="type-bar">
+      <span class="type-bar-label">${interp[k].name}</span>
+      <div class="type-bar-track">
+        <div class="type-bar-fill" style="width:${v/max*100}%;background:${interp[k].color};box-shadow:0 0 8px ${interp[k].color}88;"></div>
+      </div>
+      <span class="type-bar-score">${v}</span>
+    </div>`).join('');
+
+  // Animate bars after render
+  setTimeout(() => {}, 50);
+
+  // Save
+  const result = {
+    topType: topKey,
+    topName: top.name,
+    scores,
+    sortedTop3: sorted.slice(0,3).map(([k])=>k).join('-'),
+  };
+  Progress.saveTest('holland', result);
+}
+
+function finishTest() {
+  goToNextTest();
+}
+</script>
+</body>
+</html>
