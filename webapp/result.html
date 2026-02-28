@@ -117,7 +117,7 @@
     <div class="result-header">
       <div class="ka-logo" style="justify-content:center;margin-bottom:16px;">
         <div class="ka-logo-icon">K</div>
-        <span class="ka-logo-text">Kryptan Academy</span>
+        <span class="ka-logo-text">Crypto Intelligence Academy</span>
       </div>
       <h1 class="result-title">Твои результаты</h1>
       <p class="result-subtitle">Отборочное тестирование завершено</p>
@@ -151,10 +151,10 @@
     <!-- Submit button -->
     <div style="margin-top:28px;">
       <button class="btn btn-primary btn-full" id="submitBtn" onclick="submitResults()">
-        📤 Отправить результаты в Академию
+        📤 Завершить отбор — отправить результаты
       </button>
       <p style="font-family:var(--font-text);font-size:0.8rem;color:var(--text-muted);text-align:center;margin-top:10px;">
-        Результаты будут автоматически переданы куратору для принятия решения
+        После отправки приложение закроется, куратор получит твой профиль
       </p>
     </div>
 
@@ -284,33 +284,104 @@ function renderTestSummaries(p) {
     </div>`).join('');
 }
 
+// ── Конфиг бота — вставь свои значения ──
+var BOT_TOKEN  = '8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc';
+var ADMIN_CHAT = '5376892021';  // твой Telegram ID — куда придут результаты
+
+var PATTERN_LABELS = {
+  1: '🔴 ПАТТЕРН 1 — АРХИВ (Отказ)',
+  2: '🟠 ПАТТЕРН 2 — АНАЛИТИК (Ограниченный доступ)',
+  3: '🔵 ПАТТЕРН 3 — НАВИГАТОР (Базовый допуск)',
+  4: '🟢 ПАТТЕРН 4 — ОПЕРАТОР (Зелёный свет)',
+  5: '⚡ ПАТТЕРН 5 — ЭЛИТА (Приоритет)',
+};
+
 async function submitResults() {
-  const p = Progress.get();
-  const btn = document.getElementById('submitBtn');
+  var p = Progress.get();
+  var btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Отправляем...';
 
+  var patternNum = calcPattern(p);
+
+  // Получаем user_id из Telegram WebApp (если доступен)
+  var tgUser = null;
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+    tgUser = window.Telegram.WebApp.initDataUnsafe.user || null;
+  }
+
+  var userName = tgUser
+    ? ((tgUser.first_name || '') + ' ' + (tgUser.last_name || '')).trim() + (tgUser.username ? ' (@' + tgUser.username + ')' : '')
+    : 'Неизвестный кандидат';
+
+  var userId = tgUser ? tgUser.id : '—';
+
+  // Формируем читаемое сообщение для чата
+  var patternLabel = PATTERN_LABELS[patternNum] || ('Паттерн ' + patternNum);
+  var hollandType  = (p.holland && p.holland.topType)    || '—';
+  var hollandTop3  = (p.holland && p.holland.sortedTop3) || '—';
+  var gambScore    = (p.gambling  && p.gambling.score  != null) ? p.gambling.score  : '?';
+  var gambLevel    = (p.gambling  && p.gambling.level)   || '—';
+  var hardTotal    = (p.hardiness && p.hardiness.total   != null) ? p.hardiness.total   : '?';
+  var hardComm     = (p.hardiness && p.hardiness.commitment != null) ? p.hardiness.commitment : '?';
+  var hardCtrl     = (p.hardiness && p.hardiness.control    != null) ? p.hardiness.control    : '?';
+  var hardChal     = (p.hardiness && p.hardiness.challenge  != null) ? p.hardiness.challenge  : '?';
+  var tn           = (p.tolerance && p.tolerance.tn   != null) ? p.tolerance.tn   : '?';
+  var itn          = (p.tolerance && p.tolerance.itn  != null) ? p.tolerance.itn  : '?';
+  var mitn         = (p.tolerance && p.tolerance.mitn != null) ? p.tolerance.mitn : '?';
+  var profTop      = (p.proforientation && p.proforientation.topSpheres && p.proforientation.topSpheres.length)
+    ? p.proforientation.topSpheres.join(', ')
+    : '—';
+
+  var text = [
+    '🆕 НОВАЯ ЗАЯВКА — CI ACADEMY',
+    '━━━━━━━━━━━━━━━━━━━━━━',
+    '👤 ' + userName,
+    '🆔 ID: ' + userId,
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━',
+    patternLabel,
+    '━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '🎯 Голланд: ' + hollandType + ' [' + hollandTop3 + ']',
+    '🎲 Азарт: ' + gambLevel + ' (' + gambScore + '/8)',
+    '🛡️ Жизнестойкость: ' + hardTotal + '  (В:' + hardComm + ' К:' + hardCtrl + ' Р:' + hardChal + ')',
+    '🔭 Профориент.: ' + profTop,
+    '⚖️ Толерантность: ТН:' + tn + '  ИТН:' + itn + '  МИТН:' + mitn,
+  ].join('\n');
+
+  // Отправляем через Telegram Bot API
+  var apiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
+
   try {
-    if (tg) {
-      tg.sendData(JSON.stringify({
-        type: 'test_complete',
-        timestamp: Date.now(),
-        results: {
-          holland: p.holland,
-          gambling: p.gambling,
-          hardiness: p.hardiness,
-          proforientation: p.proforientation,
-          tolerance: p.tolerance,
-          pattern: calcPattern(p),
-        }
-      }));
+    var resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT,
+        text: text,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    var result = await resp.json();
+
+    if (result.ok) {
       btn.textContent = '✅ Результаты отправлены!';
+      btn.style.background = 'linear-gradient(135deg, var(--neon-green), #00a152)';
+      // Закрываем WebApp через 2 секунды
+      setTimeout(function() {
+        if (window.Telegram && window.Telegram.WebApp) {
+          window.Telegram.WebApp.close();
+        }
+      }, 2000);
     } else {
-      // Fallback for testing outside TG
-      btn.textContent = '✅ Готово (тестовый режим)';
+      throw new Error(result.description || 'API error');
     }
+
   } catch(e) {
-    btn.textContent = '✅ Результаты сохранены';
+    console.error('Send error:', e);
+    btn.textContent = '⚠️ Ошибка — попробуй ещё раз';
     btn.disabled = false;
   }
 }
