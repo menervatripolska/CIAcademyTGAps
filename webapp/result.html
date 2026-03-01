@@ -116,8 +116,8 @@
 
     <div class="result-header">
       <div class="ka-logo" style="justify-content:center;margin-bottom:16px;">
-        <div class="ka-logo-icon">CI</div>
-        <span class="ka-logo-text">Crypto Intelligence Academy</span>
+        <div class="ka-logo-icon">K</div>
+        <span class="ka-logo-text">Kryptan Academy</span>
       </div>
       <h1 class="result-title">Твои результаты</h1>
       <p class="result-subtitle">Отборочное тестирование завершено</p>
@@ -148,13 +148,27 @@
       </div>
     </div>
 
-    <!-- Submit button -->
+    <!-- Username input + Submit button -->
     <div style="margin-top:28px;">
+      <div style="margin-bottom:14px;">
+        <label style="font-family:var(--font-ui);font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:8px;">
+          Твой Telegram username (чтобы куратор мог написать тебе)
+        </label>
+        <div style="display:flex;align-items:center;background:var(--card-bg);border:1px solid var(--neon-purple);border-radius:10px;padding:10px 14px;gap:8px;">
+          <span style="color:var(--neon-purple);font-family:var(--font-ui);font-size:1rem;">@</span>
+          <input
+            id="usernameInput"
+            type="text"
+            placeholder="username"
+            style="background:transparent;border:none;outline:none;color:var(--text-primary);font-family:var(--font-ui);font-size:1rem;width:100%;"
+          />
+        </div>
+      </div>
       <button class="btn btn-primary btn-full" id="submitBtn" onclick="submitResults()">
         📤 Завершить отбор — отправить результаты
       </button>
       <p style="font-family:var(--font-text);font-size:0.8rem;color:var(--text-muted);text-align:center;margin-top:10px;">
-        После отправки приложение закроется, куратор получит твой профиль
+        После отправки куратор получит твой профиль и свяжется с тобой
       </p>
     </div>
 
@@ -330,8 +344,14 @@ async function submitResults() {
   var username   = (tgUser && tgUser.username)   || '';
   var userId     = (tgUser && tgUser.id)         || '';
 
-  var fullName = (firstName + ' ' + lastName).trim() || 'Неизвестный кандидат';
-  var userLink = username ? '@' + username : (userId ? 'ID: ' + userId : 'нет username');
+  // Если Telegram не дал username — берём из поля ввода
+  if (!username) {
+    var inputVal = (document.getElementById('usernameInput').value || '').trim().replace(/^@/, '');
+    if (inputVal) username = inputVal;
+  }
+
+  var fullName = (firstName + ' ' + lastName).trim() || username || 'Неизвестный кандидат';
+  var userLink = username ? '@' + username : (userId ? 'ID: ' + userId : '⚠️ нет username');
 
   // Формируем читаемое сообщение для чата
   var patternLabel = PATTERN_LABELS[patternNum] || ('Паттерн ' + patternNum);
@@ -350,8 +370,14 @@ async function submitResults() {
     ? p.proforientation.topSpheres.join(', ')
     : '—';
 
+  // Добавляем username в текст для отправки боту — чтобы бот нашёл chat_id
+  var adminPayload = {
+    username: username,
+    user_id: userId || '',
+  };
+
   var text = [
-    '🆕 НОВАЯ ЗАЯВКА — CI ACADEMY',
+    '🆕 НОВАЯ ЗАЯВКА — Crypto Intelligence ACADEMY',
     '━━━━━━━━━━━━━━━━━━━━━━',
     '👤 ' + fullName + '  ' + userLink,
     '🆔 ID: ' + (userId || '—'),
@@ -386,7 +412,9 @@ async function submitResults() {
     if (result.ok) {
       btn.textContent = '✅ Результаты отправлены!';
       btn.style.background = 'linear-gradient(135deg, var(--neon-green), #00a152)';
+
       // Закрываем WebApp через 2 секунды
+      // Сообщение пользователю отправляет бот автоматически
       setTimeout(function() {
         if (window.Telegram && window.Telegram.WebApp) {
           window.Telegram.WebApp.close();
