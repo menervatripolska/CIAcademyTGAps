@@ -10,7 +10,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN env var is required (get new token via @BotFather → /revoke)")
 ADMIN_ID  = int(os.getenv("ADMIN_ID", "5376892021"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://menervatripolska.github.io/CIAcademyTGAps/")
 

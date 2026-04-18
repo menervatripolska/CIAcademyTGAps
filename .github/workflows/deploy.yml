@@ -24,8 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # enablement: true пробует автоматически включить Pages, если ещё не включён.
+      # Требует, чтобы у GITHUB_TOKEN была роль "Read and write" (Settings → Actions → General).
+      # Если упало с 403 — включи Pages руками: Settings → Pages → Source: GitHub Actions.
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
