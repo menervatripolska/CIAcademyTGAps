@@ -40,17 +40,22 @@ CIAcademyTGapp/
 2. В настройках репо: **Settings → Pages → Source: GitHub Actions**
 3. URL будет: `https://menervatripolska.github.io/CIAcademyTGAps/`
 
-### 2. Telegram Bot
+### 2. Telegram Bot — деплой на Railway
+
+1. Получить токен у @BotFather: `/mybots` → выбрать бота → `API Token` → `Revoke current token` (или `/newbot` для нового).
+2. Залогиниться на https://railway.app через GitHub.
+3. `New Project` → `Deploy from GitHub repo` → выбрать `menervatripolska/CIAcademyTGAps`.
+4. В Settings → Variables добавить:
+   - `BOT_TOKEN` — новый токен от BotFather
+   - `ADMIN_ID` — твой Telegram ID (узнать у @userinfobot)
+   - `WEBAPP_URL` — `https://menervatripolska.github.io/CIAcademyTGAps/`
+5. Railway подхватит `Procfile` / `railway.json` и поднимет процесс `python bot/bot.py` как worker. Редеплой автоматически при каждом пуше в `main`.
+
+**Локально** (для отладки):
 ```bash
+cp .env.example .env  # заполнить BOT_TOKEN
 pip install -r requirements.txt
 python bot/bot.py
-```
-
-Или через `.env`:
-```
-BOT_TOKEN=8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc
-ADMIN_ID=5376892021
-WEBAPP_URL=https://menervatripolska.github.io/CIAcademyTGAps/
 ```
 
 ### 3. BotFather настройка
