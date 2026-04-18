@@ -38,7 +38,7 @@ CIAcademyTGapp/
 ### 1. GitHub Pages (WebApp)
 1. Пуш в репозиторий → GitHub Actions автоматически деплоит `webapp/` на Pages
 2. В настройках репо: **Settings → Pages → Source: GitHub Actions**
-3. URL будет: `https://menervatripolska.github.io/CIAcademyTGapp/`
+3. URL будет: `https://menervatripolska.github.io/CIAcademyTGAps/`
 
 ### 2. Telegram Bot
 ```bash
@@ -50,11 +50,11 @@ python bot/bot.py
 ```
 BOT_TOKEN=8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc
 ADMIN_ID=5376892021
-WEBAPP_URL=https://menervatripolska.github.io/CIAcademyTGapp/webapp
+WEBAPP_URL=https://menervatripolska.github.io/CIAcademyTGAps/
 ```
 
 ### 3. BotFather настройка
-1. `/newapp` → указать URL: `https://menervatripolska.github.io/CIAcademyTGapp/webapp`
+1. `/newapp` → указать URL: `https://menervatripolska.github.io/CIAcademyTGAps/`
 2. Или Menu Button: `/setmenubutton` → URL выше
 
 ---

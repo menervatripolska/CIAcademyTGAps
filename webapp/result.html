@@ -298,10 +298,6 @@ function renderTestSummaries(p) {
     </div>`).join('');
 }
 
-// ── Конфиг бота — вставь свои значения ──
-var BOT_TOKEN  = '8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc';
-var ADMIN_CHAT = '5376892021';  // твой Telegram ID — куда придут результаты
-
 var PATTERN_LABELS = {
   1: '🔴 ПАТТЕРН 1 — АРХИВ (Отказ)',
   2: '🟠 ПАТТЕРН 2 — АНАЛИТИК (Ограниченный доступ)',
@@ -310,122 +306,45 @@ var PATTERN_LABELS = {
   5: '⚡ ПАТТЕРН 5 — ЭЛИТА (Приоритет)',
 };
 
-async function submitResults() {
+function submitResults() {
   var p = Progress.get();
   var btn = document.getElementById('submitBtn');
+  var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+
+  // Без Telegram WebApp отправлять некуда
+  if (!tgWebApp || typeof tgWebApp.sendData !== 'function') {
+    btn.textContent = '⚠️ Открой страницу через Telegram-бота';
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = '⏳ Отправляем...';
 
   var patternNum = calcPattern(p);
 
-  // Получаем данные пользователя из Telegram WebApp
-  var tgWebApp = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var tgUser = null;
+  // Username из поля ввода (на случай если у пользователя скрыт в Telegram)
+  var manualUsername = (document.getElementById('usernameInput').value || '').trim().replace(/^@/, '');
 
-  // Способ 1: initDataUnsafe.user (работает в большинстве случаев)
-  if (tgWebApp && tgWebApp.initDataUnsafe && tgWebApp.initDataUnsafe.user) {
-    tgUser = tgWebApp.initDataUnsafe.user;
-  }
-
-  // Способ 2: парсим initData вручную если initDataUnsafe пустой
-  if (!tgUser && tgWebApp && tgWebApp.initData && tgWebApp.initData.length > 0) {
-    try {
-      var params = new URLSearchParams(tgWebApp.initData);
-      var userParam = params.get('user');
-      if (userParam) {
-        tgUser = JSON.parse(decodeURIComponent(userParam));
-      }
-    } catch(e) { console.warn('initData parse error:', e); }
-  }
-
-  // Собираем имя и username
-  var firstName  = (tgUser && tgUser.first_name) || '';
-  var lastName   = (tgUser && tgUser.last_name)  || '';
-  var username   = (tgUser && tgUser.username)   || '';
-  var userId     = (tgUser && tgUser.id)         || '';
-
-  // Если Telegram не дал username — берём из поля ввода
-  if (!username) {
-    var inputVal = (document.getElementById('usernameInput').value || '').trim().replace(/^@/, '');
-    if (inputVal) username = inputVal;
-  }
-
-  var fullName = (firstName + ' ' + lastName).trim() || username || 'Неизвестный кандидат';
-  var userLink = username ? '@' + username : (userId ? 'ID: ' + userId : '⚠️ нет username');
-
-  // Формируем читаемое сообщение для чата
-  var patternLabel = PATTERN_LABELS[patternNum] || ('Паттерн ' + patternNum);
-  var hollandType  = (p.holland && p.holland.topType)    || '—';
-  var hollandTop3  = (p.holland && p.holland.sortedTop3) || '—';
-  var gambScore    = (p.gambling  && p.gambling.score  != null) ? p.gambling.score  : '?';
-  var gambLevel    = (p.gambling  && p.gambling.level)   || '—';
-  var hardTotal    = (p.hardiness && p.hardiness.total   != null) ? p.hardiness.total   : '?';
-  var hardComm     = (p.hardiness && p.hardiness.commitment != null) ? p.hardiness.commitment : '?';
-  var hardCtrl     = (p.hardiness && p.hardiness.control    != null) ? p.hardiness.control    : '?';
-  var hardChal     = (p.hardiness && p.hardiness.challenge  != null) ? p.hardiness.challenge  : '?';
-  var tn           = (p.tolerance && p.tolerance.tn   != null) ? p.tolerance.tn   : '?';
-  var itn          = (p.tolerance && p.tolerance.itn  != null) ? p.tolerance.itn  : '?';
-  var mitn         = (p.tolerance && p.tolerance.mitn != null) ? p.tolerance.mitn : '?';
-  var profTop      = (p.proforientation && p.proforientation.topSpheres && p.proforientation.topSpheres.length)
-    ? p.proforientation.topSpheres.join(', ')
-    : '—';
-
-  // Добавляем username в текст для отправки боту — чтобы бот нашёл chat_id
-  var adminPayload = {
-    username: username,
-    user_id: userId || '',
+  // Формат под хэндлер F.web_app_data в bot.py
+  var payload = {
+    results: {
+      pattern: patternNum,
+      holland: p.holland || null,
+      gambling: p.gambling || null,
+      hardiness: p.hardiness || null,
+      proforientation: p.proforientation || null,
+      tolerance: p.tolerance || null,
+    },
+    manual_username: manualUsername,
   };
 
-  var text = [
-    '🆕 НОВАЯ ЗАЯВКА — Crypto Intelligence ACADEMY',
-    '━━━━━━━━━━━━━━━━━━━━━━',
-    '👤 ' + fullName + '  ' + userLink,
-    '🆔 ID: ' + (userId || '—'),
-    '',
-    '━━━━━━━━━━━━━━━━━━━━━━',
-    patternLabel,
-    '━━━━━━━━━━━━━━━━━━━━━━',
-    '',
-    '🎯 Голланд: ' + hollandType + ' [' + hollandTop3 + ']',
-    '🎲 Азарт: ' + gambLevel + ' (' + gambScore + '/8)',
-    '🛡️ Жизнестойкость: ' + hardTotal + '  (В:' + hardComm + ' К:' + hardCtrl + ' Р:' + hardChal + ')',
-    '🔭 Профориент.: ' + profTop,
-    '⚖️ Толерантность: ТН:' + tn + '  ИТН:' + itn + '  МИТН:' + mitn,
-  ].join('\n');
-
-  // Отправляем через Telegram Bot API
-  var apiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
-
   try {
-    var resp = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ADMIN_CHAT,
-        text: text,
-        parse_mode: 'HTML',
-      }),
-    });
-
-    var result = await resp.json();
-
-    if (result.ok) {
-      btn.textContent = '✅ Результаты отправлены!';
-      btn.style.background = 'linear-gradient(135deg, var(--neon-green), #00a152)';
-
-      // Закрываем WebApp через 2 секунды
-      // Сообщение пользователю отправляет бот автоматически
-      setTimeout(function() {
-        if (window.Telegram && window.Telegram.WebApp) {
-          window.Telegram.WebApp.close();
-        }
-      }, 2000);
-    } else {
-      throw new Error(result.description || 'API error');
-    }
-
+    tgWebApp.sendData(JSON.stringify(payload));
+    // После sendData Telegram сам закрывает WebApp — но на всякий случай
+    btn.textContent = '✅ Отправлено';
+    setTimeout(function() { try { tgWebApp.close(); } catch(e) {} }, 1500);
   } catch(e) {
-    console.error('Send error:', e);
+    console.error('sendData failed', e);
     btn.textContent = '⚠️ Ошибка — попробуй ещё раз';
     btn.disabled = false;
   }

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8753082286:AAH2IAfGsQ_X_k4oxf6Tpj2jQeWjHT6ZVJc")
 ADMIN_ID  = int(os.getenv("ADMIN_ID", "5376892021"))
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://menervatripolska.github.io/CIAcademyTGapp/webapp")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://menervatripolska.github.io/CIAcademyTGAps/")
 
 bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher()
@@ -60,7 +60,9 @@ async def handle_webapp_data(message: types.Message):
         data = json.loads(message.web_app_data.data)
         results = data.get('results', {})
         pattern = results.get('pattern', 0)
+        manual_username = (data.get('manual_username') or '').strip().lstrip('@')
         user = message.from_user
+        effective_username = user.username or manual_username
 
         # Confirm to user
         pattern_text = PATTERN_NAMES.get(pattern, f"Паттерн {pattern}")
@@ -82,7 +84,7 @@ async def handle_webapp_data(message: types.Message):
             f"🆕 <b>НОВАЯ ЗАЯВКА — KRYPTAN ACADEMY</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>Кандидат:</b> {user.full_name}"
-            f"{f' (@{user.username})' if user.username else ''}\n"
+            f"{f' (@{effective_username})' if effective_username else ''}\n"
             f"🆔 ID: <code>{user.id}</code>\n"
             f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
