@@ -38,7 +38,7 @@ async def cmd_start(message: types.Message):
     ]])
 
     await message.answer(
-        "🦄 <b>Kryptan Academy</b>\n\n"
+        "🦄 <b>CI Academy</b>\n\n"
         "Добро пожаловать в систему вступительного отбора.\n\n"
         "Академия не берёт всех подряд. Нам нужны те, кто психологически готов "
         "работать с реальными рисками крипто-рынка.\n\n"
@@ -83,7 +83,7 @@ async def handle_webapp_data(message: types.Message):
         tolerance = results.get('tolerance', {})
 
         admin_text = (
-            f"🆕 <b>НОВАЯ ЗАЯВКА — KRYPTAN ACADEMY</b>\n"
+            f"🆕 <b>НОВАЯ ЗАЯВКА — CI ACADEMY</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>Кандидат:</b> {user.full_name}"
             f"{f' (@{effective_username})' if effective_username else ''}\n"
@@ -130,7 +130,7 @@ async def admin_accept(callback: types.CallbackQuery):
             "🎉 <b>Поздравляем!</b>\n\n"
             "Академия приняла решение — вы прошли отборочное тестирование.\n"
             "Куратор свяжется с вами для дальнейших инструкций.\n\n"
-            "Добро пожаловать в Kryptan Academy! 🦄⚡",
+            "Добро пожаловать в CI Academy! 🦄⚡",
             parse_mode="HTML"
         )
         await callback.message.edit_reply_markup(reply_markup=None)
@@ -174,7 +174,7 @@ async def cmd_admin(message: types.Message):
 
 
 async def main():
-    logger.info("Starting Kryptan Academy Bot...")
+    logger.info("Starting CI Academy Bot...")
     await dp.start_polling(bot, skip_updates=True)
 
 

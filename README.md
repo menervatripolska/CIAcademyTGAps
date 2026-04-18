@@ -1,4 +1,4 @@
-# 🦄 Kryptan Academy — Telegram Mini App
+# 🦄 CI Academy — Telegram Mini App
 
 > Dark Cinematic × Neon Purple × Crypto Unicorn
 

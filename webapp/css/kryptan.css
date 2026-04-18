@@ -1,44 +1,51 @@
 /* ═══════════════════════════════════════════════════════
-   KRYPTAN ACADEMY — Dark Cinematic Realism × Neon Purple
-   Design System v2.0
+   CI ACADEMY — Entrance Test
+   Design System aligned with ciacademy.kz (Manrope + Rajdhani)
    ═══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
 /* ── VARIABLES ── */
 :root {
-  --bg-void:        #050508;
-  --bg-deep:        #0a0a12;
-  --bg-card:        #0f0f1a;
-  --bg-card-hover:  #141425;
-  --bg-glass:       rgba(138, 43, 226, 0.06);
+  /* Surface — из ciacademy index.css (oklch(0.09 0.02 270) и т.д.) */
+  --bg-void:        #0c0b14;   /* background */
+  --bg-deep:        #100f1a;
+  --bg-card:        #14121f;   /* card */
+  --bg-card-hover:  #1a1828;
+  --bg-glass:       rgba(153, 69, 255, 0.05);
 
-  --neon-purple:    #9b30ff;
-  --neon-violet:    #bf5fff;
-  --neon-pink:      #e040fb;
-  --neon-green:     #00e676;
-  --neon-cyan:      #00e5ff;
-  --neon-gold:      #ffd740;
+  /* Accents — green primary, purple accent (как на лендинге) */
+  --neon-green:     #00d4aa;   /* primary — oklch(0.82 0.19 163) */
+  --neon-emerald:   #00b894;
+  --neon-purple:    #9945ff;   /* accent — oklch(0.58 0.27 292) */
+  --neon-violet:    #bf85ff;
+  --neon-cyan:      #4fcde8;   /* chart-3 */
+  --neon-gold:      #f2cb4a;   /* chart-4 */
+  --neon-pink:      #e55aa8;   /* chart-5 */
 
-  --purple-glow:    0 0 20px rgba(155, 48, 255, 0.6), 0 0 60px rgba(155, 48, 255, 0.2);
-  --green-glow:     0 0 20px rgba(0, 230, 118, 0.5), 0 0 50px rgba(0, 230, 118, 0.15);
-  --card-glow:      0 0 1px rgba(155, 48, 255, 0.3), 0 8px 32px rgba(0,0,0,0.6);
+  /* Glow */
+  --green-glow:     0 0 20px rgba(0, 212, 170, 0.45), 0 0 60px rgba(0, 212, 170, 0.15);
+  --purple-glow:    0 0 20px rgba(153, 69, 255, 0.55), 0 0 60px rgba(153, 69, 255, 0.18);
+  --card-glow:      0 0 1px rgba(0, 212, 170, 0.25), 0 8px 32px rgba(0,0,0,0.6);
 
-  --border-neon:    rgba(155, 48, 255, 0.35);
-  --border-subtle:  rgba(255, 255, 255, 0.06);
+  /* Borders */
+  --border-neon:    rgba(0, 212, 170, 0.35);
+  --border-subtle:  rgba(255, 255, 255, 0.07);
 
-  --text-primary:   #f0e8ff;
-  --text-secondary: #a89bc2;
-  --text-muted:     #5a5272;
+  /* Text — oklch(0.95 0.01 270) ≈ #ece9f1 */
+  --text-primary:   #ece9f1;
+  --text-secondary: #b7b3c4;
+  --text-muted:     #7d7990;
 
-  --font-title:     'Orbitron', monospace;
-  --font-body:      'Rajdhani', sans-serif;
-  --font-text:      'Inter', sans-serif;
+  /* Typography — Rajdhani для заголовков/UI, Manrope для тела */
+  --font-title:     'Rajdhani', system-ui, sans-serif;
+  --font-body:      'Rajdhani', system-ui, sans-serif;
+  --font-text:      'Manrope', system-ui, sans-serif;
 
   --radius-sm:      8px;
-  --radius-md:      14px;
-  --radius-lg:      20px;
-  --radius-xl:      28px;
+  --radius-md:      12px;
+  --radius-lg:      18px;
+  --radius-xl:      24px;
 
   --transition:     0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -63,9 +70,9 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(155, 48, 255, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(0, 230, 118, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(155, 48, 255, 0.04) 0%, transparent 70%);
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(0, 212, 170, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(153, 69, 255, 0.08) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(79, 205, 232, 0.03) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -76,11 +83,11 @@ body::after {
   position: fixed;
   inset: 0;
   background-image:
-    radial-gradient(1px 1px at 20% 30%, rgba(155,48,255,0.6) 0%, transparent 100%),
-    radial-gradient(1px 1px at 80% 10%, rgba(0,230,118,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 20% 30%, rgba(153, 69, 255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%, rgba(0, 212, 170,0.4) 0%, transparent 100%),
     radial-gradient(1px 1px at 50% 70%, rgba(191,95,255,0.5) 0%, transparent 100%),
     radial-gradient(1px 1px at 10% 80%, rgba(0,229,255,0.3) 0%, transparent 100%),
-    radial-gradient(1px 1px at 90% 60%, rgba(155,48,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 60%, rgba(153, 69, 255,0.4) 0%, transparent 100%),
     radial-gradient(1px 1px at 35% 90%, rgba(255,215,64,0.3) 0%, transparent 100%);
   background-size: 400px 400px;
   animation: particleDrift 20s linear infinite;
@@ -146,17 +153,14 @@ body::after {
 
 .ka-title {
   font-family: var(--font-title);
-  font-size: clamp(1.6rem, 5vw, 2.4rem);
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  line-height: 1.15;
-  background: linear-gradient(135deg, #fff 0%, var(--neon-violet) 50%, var(--neon-purple) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: var(--text-primary);
   text-shadow: none;
   margin-bottom: 12px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .ka-subtitle {
@@ -182,7 +186,7 @@ body::after {
   inset: 0;
   background: linear-gradient(180deg,
     transparent 0%,
-    rgba(155, 48, 255, 0.08) 50%,
+    rgba(153, 69, 255, 0.08) 50%,
     transparent 100%);
 }
 
@@ -193,7 +197,7 @@ body::after {
   object-fit: cover;
   object-position: top center;
   border: 2px solid var(--border-neon);
-  box-shadow: var(--purple-glow), 0 0 0 8px rgba(155,48,255,0.08);
+  box-shadow: var(--purple-glow), 0 0 0 8px rgba(153, 69, 255,0.08);
   position: relative;
   z-index: 1;
   animation: heroFloat 4s ease-in-out infinite;
@@ -262,7 +266,7 @@ body::after {
 }
 
 .ka-card:hover {
-  border-color: rgba(155, 48, 255, 0.6);
+  border-color: rgba(153, 69, 255, 0.6);
   box-shadow: var(--purple-glow), 0 8px 40px rgba(0,0,0,0.7);
 }
 
@@ -306,7 +310,7 @@ body::after {
   background: linear-gradient(90deg, var(--neon-purple), var(--neon-green));
   border-radius: 3px;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 10px rgba(155,48,255,0.6);
+  box-shadow: 0 0 10px rgba(153, 69, 255,0.6);
 }
 
 /* ── TEST STEPS ── */
@@ -341,20 +345,20 @@ body::after {
 
 .step-item.done .step-icon {
   border-color: var(--neon-green);
-  background: rgba(0, 230, 118, 0.1);
-  box-shadow: 0 0 16px rgba(0,230,118,0.3);
+  background: rgba(0, 212, 170, 0.1);
+  box-shadow: 0 0 16px rgba(0, 212, 170,0.3);
 }
 
 .step-item.active .step-icon {
   border-color: var(--neon-purple);
-  background: rgba(155,48,255,0.15);
+  background: rgba(153, 69, 255,0.15);
   box-shadow: var(--purple-glow);
   animation: stepPulse 2s ease-in-out infinite;
 }
 
 @keyframes stepPulse {
   0%, 100% { box-shadow: var(--purple-glow); }
-  50%       { box-shadow: 0 0 30px rgba(155,48,255,0.8), 0 0 80px rgba(155,48,255,0.3); }
+  50%       { box-shadow: 0 0 30px rgba(153, 69, 255,0.8), 0 0 80px rgba(153, 69, 255,0.3); }
 }
 
 .step-item.locked .step-icon {
@@ -442,9 +446,9 @@ body::after {
 }
 
 .option-btn:hover {
-  border-color: rgba(155,48,255,0.4);
+  border-color: rgba(153, 69, 255,0.4);
   color: var(--text-primary);
-  background: rgba(155,48,255,0.08);
+  background: rgba(153, 69, 255,0.08);
 }
 
 .option-btn:hover::before {
@@ -453,9 +457,9 @@ body::after {
 
 .option-btn.selected {
   border-color: var(--neon-purple);
-  background: rgba(155,48,255,0.15);
+  background: rgba(153, 69, 255,0.15);
   color: var(--text-primary);
-  box-shadow: inset 0 0 20px rgba(155,48,255,0.1), var(--card-glow);
+  box-shadow: inset 0 0 20px rgba(153, 69, 255,0.1), var(--card-glow);
 }
 
 .option-btn.selected::before {
@@ -489,14 +493,14 @@ body::after {
 }
 
 .scale-btn:hover {
-  border-color: rgba(155,48,255,0.5);
+  border-color: rgba(153, 69, 255,0.5);
   color: var(--neon-violet);
-  background: rgba(155,48,255,0.1);
+  background: rgba(153, 69, 255,0.1);
 }
 
 .scale-btn.selected {
   border-color: var(--neon-purple);
-  background: rgba(155,48,255,0.2);
+  background: rgba(153, 69, 255,0.2);
   color: #fff;
   box-shadow: var(--purple-glow);
 }
@@ -532,37 +536,37 @@ body::after {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--neon-purple), #6a0dad);
-  color: #fff;
-  box-shadow: var(--purple-glow);
+  background: linear-gradient(135deg, var(--neon-green), var(--neon-emerald));
+  color: #07261f;
+  box-shadow: var(--green-glow);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 30px rgba(155,48,255,0.8), 0 0 80px rgba(155,48,255,0.3);
+  box-shadow: 0 0 30px rgba(0, 212, 170, 0.75), 0 0 80px rgba(0, 212, 170, 0.28);
 }
 
 .btn-primary:active { transform: translateY(0); }
 
 .btn-success {
-  background: linear-gradient(135deg, var(--neon-green), #00a152);
-  color: #000;
+  background: linear-gradient(135deg, var(--neon-green), var(--neon-emerald));
+  color: #07261f;
   box-shadow: var(--green-glow);
 }
 
 .btn-success:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 30px rgba(0,230,118,0.7), 0 0 60px rgba(0,230,118,0.25);
+  box-shadow: 0 0 30px rgba(0, 212, 170, 0.75), 0 0 60px rgba(0, 212, 170, 0.25);
 }
 
 .btn-outline {
   background: transparent;
-  border: 1px solid var(--border-neon);
+  border: 1px solid rgba(153, 69, 255, 0.45);
   color: var(--neon-violet);
 }
 
 .btn-outline:hover {
-  background: rgba(155,48,255,0.1);
+  background: rgba(153, 69, 255, 0.1);
   border-color: var(--neon-purple);
 }
 
@@ -667,7 +671,7 @@ body::after {
   height: 100%;
   border-radius: 3px;
   background: linear-gradient(90deg, var(--neon-purple), var(--neon-violet));
-  box-shadow: 0 0 8px rgba(155,48,255,0.5);
+  box-shadow: 0 0 8px rgba(153, 69, 255,0.5);
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -733,8 +737,8 @@ body::after {
 .verdict-card.p1 { background: linear-gradient(135deg, rgba(255,50,50,0.08), rgba(20,10,15,0.95)); }
 .verdict-card.p2 { background: linear-gradient(135deg, rgba(255,150,0,0.08), rgba(15,12,20,0.95)); }
 .verdict-card.p3 { background: linear-gradient(135deg, rgba(0,200,255,0.08), rgba(10,10,20,0.95)); }
-.verdict-card.p4 { background: linear-gradient(135deg, rgba(0,230,118,0.1), rgba(8,15,12,0.95)); }
-.verdict-card.p5 { background: linear-gradient(135deg, rgba(155,48,255,0.15), rgba(10,5,20,0.95)); }
+.verdict-card.p4 { background: linear-gradient(135deg, rgba(0, 212, 170,0.1), rgba(8,15,12,0.95)); }
+.verdict-card.p5 { background: linear-gradient(135deg, rgba(153, 69, 255,0.15), rgba(10,5,20,0.95)); }
 
 .verdict-pattern-num {
   font-family: var(--font-title);
@@ -747,7 +751,7 @@ body::after {
 .p1 .verdict-pattern-num { color: #ff5252; text-shadow: 0 0 30px rgba(255,82,82,0.6); }
 .p2 .verdict-pattern-num { color: #ff9800; text-shadow: 0 0 30px rgba(255,152,0,0.6); }
 .p3 .verdict-pattern-num { color: var(--neon-cyan); text-shadow: 0 0 30px rgba(0,229,255,0.6); }
-.p4 .verdict-pattern-num { color: var(--neon-green); text-shadow: 0 0 30px rgba(0,230,118,0.6); }
+.p4 .verdict-pattern-num { color: var(--neon-green); text-shadow: 0 0 30px rgba(0, 212, 170,0.6); }
 .p5 .verdict-pattern-num { color: var(--neon-violet); text-shadow: 0 0 30px rgba(191,95,255,0.8); }
 
 .verdict-pattern-name {
@@ -795,14 +799,14 @@ body::after {
 
 .welcome-hero .hero-m {
   transform: translateX(14px);
-  border-color: rgba(0,230,118,0.5);
+  border-color: rgba(0, 212, 170,0.5);
   box-shadow: var(--green-glow);
   animation: heroFloat 4s ease-in-out infinite;
 }
 
 .welcome-hero .hero-f {
   transform: translateX(-14px);
-  border-color: rgba(155,48,255,0.6);
+  border-color: rgba(153, 69, 255,0.6);
   box-shadow: var(--purple-glow);
   animation: heroFloat 4s ease-in-out infinite 2s;
 }
@@ -881,7 +885,7 @@ body::after {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(155,48,255,0.2);
+  border: 3px solid rgba(153, 69, 255,0.2);
   border-top-color: var(--neon-purple);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -893,7 +897,7 @@ body::after {
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg-void); }
-::-webkit-scrollbar-thumb { background: rgba(155,48,255,0.4); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(153, 69, 255,0.4); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--neon-purple); }
 
 /* ── UTILS ── */
@@ -921,14 +925,24 @@ body::after {
 
 .neon-badge.purple {
   color: var(--neon-violet);
-  border-color: rgba(155,48,255,0.4);
-  background: rgba(155,48,255,0.1);
+  border-color: rgba(153, 69, 255,0.4);
+  background: rgba(153, 69, 255,0.1);
 }
 
 .neon-badge.green {
   color: var(--neon-green);
-  border-color: rgba(0,230,118,0.4);
-  background: rgba(0,230,118,0.08);
+  border-color: rgba(0, 212, 170,0.4);
+  background: rgba(0, 212, 170,0.08);
+}
+
+
+/* ── GRADIENT TEXT (бренд ciacademy.kz) ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan), var(--neon-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
 }
 
 /* ── MOBILE ADJUSTMENTS ── */
