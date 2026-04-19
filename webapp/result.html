@@ -48,7 +48,7 @@
       to { opacity: 0; visibility: hidden; pointer-events: none; }
     }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css?v=1776601227">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776602263">
   <style>
     .result-block { display: none; }
     .result-block.visible { display: block; }
@@ -445,59 +445,57 @@ async function submitResults() {
   var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
   var initData = tgWebApp && tgWebApp.initData ? tgWebApp.initData : '';
   var payload = buildPayload();
-  var lastErr = '';
 
   btn.disabled = true;
   btn.textContent = '⏳ Отправляем...';
 
-  console.log('[CIA] submit', {api: CIA_API_URL, hasInit: initData.length > 0});
-
-  if (CIA_API_URL) {
-    if (initData.length === 0) {
-      lastErr = 'no_init_data';
-    } else {
-      try {
-        var resp = await fetch(CIA_API_URL + '/api/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData,
-          },
-          body: JSON.stringify(payload),
-        });
-        var txt = '';
-        try { txt = await resp.text(); } catch(_) {}
-        console.log('[CIA] API', resp.status, txt.slice(0,300));
-        if (resp.ok) { markSuccess(btn, tgWebApp); return; }
-        lastErr = 'api_' + resp.status + (txt ? ':' + txt.slice(0,60) : '');
-      } catch (e) {
-        lastErr = 'fetch_fail:' + (e && e.message ? e.message.slice(0,60) : 'unknown');
-        console.error('[CIA] fetch fail', e);
-      }
-    }
-  } else {
-    lastErr = 'no_api_url';
+  if (\!CIA_API_URL) {
+    markError(btn, 'Ошибка: API URL не задан в HTML');
+    return;
+  }
+  if (\!initData) {
+    markError(btn, 'Ошибка: открой через @бота (нет initData)');
+    return;
   }
 
-  if (tgWebApp && typeof tgWebApp.sendData === 'function') {
-    try {
-      tgWebApp.sendData(JSON.stringify(payload));
-      markSuccess(btn, tgWebApp);
-      return;
-    } catch (e) {
-      console.error('[CIA] sendData fail', e);
-      lastErr = lastErr + '|sendData_fail';
-    }
-  } else {
-    lastErr = lastErr + '|no_sendData';
-  }
-
-  markError(btn, '⚠ Ошибка: ' + lastErr.slice(0,80));
   try {
-    if (tgWebApp && tgWebApp.showAlert) {
-      tgWebApp.showAlert('Код ошибки: ' + lastErr + '\n\nПерешли куратору.');
+    var resp = await fetch(CIA_API_URL + '/api/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Telegram-Init-Data': initData,
+      },
+      body: JSON.stringify(payload),
+    });
+    var txt = '';
+    try { txt = await resp.text(); } catch(_) {}
+    console.log('[CIA] API resp', resp.status, txt);
+
+    if (resp.ok) {
+      btn.textContent = '✅ Результаты у бота. Проверь чат.';
+      setTimeout(function(){
+        try { if (tgWebApp) tgWebApp.close(); } catch(e) {}
+      }, 2000);
+      return;
     }
-  } catch(e) {}
+
+    var code = 'api_' + resp.status + (txt ? ': ' + txt.slice(0,80) : '');
+    markError(btn, code);
+    try {
+      if (tgWebApp && tgWebApp.showAlert) {
+        tgWebApp.showAlert('Бот ответил с ошибкой:\n' + code + '\n\nПришли куратору.');
+      }
+    } catch(_) {}
+  } catch (e) {
+    var msg = 'fetch_fail: ' + (e && e.message ? e.message : 'network');
+    console.error('[CIA] fetch error', e);
+    markError(btn, msg);
+    try {
+      if (tgWebApp && tgWebApp.showAlert) {
+        tgWebApp.showAlert('Не достучаться до бэкенда:\n' + msg + '\n\nПришли куратору.');
+      }
+    } catch(_) {}
+  }
 }
 // Init
 document.addEventListener('DOMContentLoaded', () => {
