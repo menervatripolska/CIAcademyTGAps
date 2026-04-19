@@ -7,7 +7,8 @@
     <style id="splash-inline">
     /* Мгновенный сплэш: перекрывает всё до загрузки основного CSS — чтобы не мелькал doctype/сырой HTML */
     html, body { background:#0c0b14; color:#ece9f1; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    body { visibility: hidden; }
+    body { visibility: hidden; animation: cia-force-show 3s steps(1,end) forwards; }
+    @keyframes cia-force-show { to { visibility: visible; } }
     #ciaSplash {
       position: fixed; inset: 0; z-index: 2147483647;
       background: radial-gradient(circle at 50% 40%, #1a1430 0%, #0c0b14 70%);
@@ -37,7 +38,7 @@
     body.is-ready { visibility: visible; }
     body.is-ready #ciaSplash { opacity: 0; pointer-events: none; }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776560646">
   <style>
     .welcome-screen, .dashboard-screen { display: none; }
     .welcome-screen.active, .dashboard-screen.active { display: block; }
