@@ -47,7 +47,7 @@
       to { opacity: 0; visibility: hidden; pointer-events: none; }
     }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css?v=1776591864">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776596050">
   <style>
     .result-block { display: none; }
     .result-block.visible { display: block; }
@@ -444,44 +444,59 @@ async function submitResults() {
   var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
   var initData = tgWebApp && tgWebApp.initData ? tgWebApp.initData : '';
   var payload = buildPayload();
+  var lastErr = '';
 
   btn.disabled = true;
-  btn.textContent = '⏳ Отправляем…';
+  btn.textContent = '⏳ Отправляем...';
 
-  // 1) Основной путь: HTTP API бота с подписью initData — работает независимо от способа открытия.
-  if (CIA_API_URL && initData) {
-    try {
-      var resp = await fetch(CIA_API_URL + '/api/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (resp.ok) {
-        markSuccess(btn, tgWebApp);
-        return;
+  console.log('[CIA] submit', {api: CIA_API_URL, hasInit: initData.length > 0});
+
+  if (CIA_API_URL) {
+    if (initData.length === 0) {
+      lastErr = 'no_init_data';
+    } else {
+      try {
+        var resp = await fetch(CIA_API_URL + '/api/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': initData,
+          },
+          body: JSON.stringify(payload),
+        });
+        var txt = '';
+        try { txt = await resp.text(); } catch(_) {}
+        console.log('[CIA] API', resp.status, txt.slice(0,300));
+        if (resp.ok) { markSuccess(btn, tgWebApp); return; }
+        lastErr = 'api_' + resp.status + (txt ? ':' + txt.slice(0,60) : '');
+      } catch (e) {
+        lastErr = 'fetch_fail:' + (e && e.message ? e.message.slice(0,60) : 'unknown');
+        console.error('[CIA] fetch fail', e);
       }
-      console.warn('API submit returned', resp.status);
-    } catch (e) {
-      console.warn('API submit failed', e);
     }
+  } else {
+    lastErr = 'no_api_url';
   }
 
-  // 2) Фолбэк: sendData — работает только из Reply-кнопки, но пробуем на всякий случай.
   if (tgWebApp && typeof tgWebApp.sendData === 'function') {
     try {
       tgWebApp.sendData(JSON.stringify(payload));
       markSuccess(btn, tgWebApp);
       return;
     } catch (e) {
-      console.error('sendData failed', e);
+      console.error('[CIA] sendData fail', e);
+      lastErr = lastErr + '|sendData_fail';
     }
+  } else {
+    lastErr = lastErr + '|no_sendData';
   }
 
-  // 3) Не вышло — честно говорим пользователю.
-  markError(btn, '⚠️ Не удалось отправить. Проверь интернет и попробуй ещё раз.');
+  markError(btn, '⚠ Ошибка: ' + lastErr.slice(0,80));
+  try {
+    if (tgWebApp && tgWebApp.showAlert) {
+      tgWebApp.showAlert('Код ошибки: ' + lastErr + '\n\nПерешли куратору.');
+    }
+  } catch(e) {}
 }
 // Init
 document.addEventListener('DOMContentLoaded', () => {
