@@ -449,11 +449,11 @@ async function submitResults() {
   btn.disabled = true;
   btn.textContent = '⏳ Отправляем...';
 
-  if (\!CIA_API_URL) {
+  if (!CIA_API_URL) {
     markError(btn, 'Ошибка: API URL не задан в HTML');
     return;
   }
-  if (\!initData) {
+  if (!initData) {
     markError(btn, 'Ошибка: открой через @бота (нет initData)');
     return;
   }
