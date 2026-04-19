@@ -46,7 +46,7 @@
       to { opacity: 0; visibility: hidden; pointer-events: none; }
     }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css?v=1776587158">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776589907">
   <style>
     .result-block { display: none; }
     .result-block.visible { display: block; }
@@ -402,36 +402,17 @@ var PATTERN_LABELS = {
   5: '⚡ ПАТТЕРН 5 — ЭЛИТА (Приоритет)',
 };
 
-function submitResults() {
+// API URL бота — ставим из <meta name="cia-api">.
+var CIA_API_URL = (function(){
+  var m = document.querySelector('meta[name="cia-api"]');
+  return m && m.content ? m.content.replace(/\/+$/, '') : '';
+})();
+
+function buildPayload() {
   var p = Progress.get();
-  var btn = document.getElementById('submitBtn');
-  var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
-
-  // Без Telegram WebApp отправлять некуда
-  if (!tgWebApp || typeof tgWebApp.sendData !== 'function') {
-    btn.disabled = true;
-    btn.textContent = '⚠️ Открой через кнопку в чате';
-    var hint = document.getElementById('submitHint');
-    if (!hint) {
-      hint = document.createElement('div');
-      hint.id = 'submitHint';
-      hint.style.cssText = 'margin-top:14px;padding:14px 16px;border:1px solid rgba(0,212,170,0.35);background:rgba(0,212,170,0.08);border-radius:12px;color:#ece9f1;font-size:14px;line-height:1.5;';
-      hint.innerHTML = 'Чтобы отправить результаты в Академию, открой мини-апп через кнопку <b>«⚡ Пройти вступительный отбор»</b> на нижней клавиатуре в чате с ботом. Через Menu Button (синяя кнопка слева внизу) или прямую ссылку отправка заблокирована Telegram.';
-      btn.parentNode.insertBefore(hint, btn.nextSibling);
-    }
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Отправляем...';
-
   var patternNum = calcPattern(p);
-
-  // Username из поля ввода (на случай если у пользователя скрыт в Telegram)
   var manualUsername = (document.getElementById('usernameInput').value || '').trim().replace(/^@/, '');
-
-  // Формат под хэндлер F.web_app_data в bot.py
-  var payload = {
+  return {
     results: {
       pattern: patternNum,
       holland: p.holland || null,
@@ -442,19 +423,65 @@ function submitResults() {
     },
     manual_username: manualUsername,
   };
-
-  try {
-    tgWebApp.sendData(JSON.stringify(payload));
-    // После sendData Telegram сам закрывает WebApp — но на всякий случай
-    btn.textContent = '✅ Отправлено';
-    setTimeout(function() { try { tgWebApp.close(); } catch(e) {} }, 1500);
-  } catch(e) {
-    console.error('sendData failed', e);
-    btn.textContent = '⚠️ Ошибка — попробуй ещё раз';
-    btn.disabled = false;
-  }
 }
 
+function markSuccess(btn, tgWebApp, msg) {
+  btn.disabled = true;
+  btn.textContent = msg || '✅ Отправлено — закрываем…';
+  setTimeout(function(){
+    try { if (tgWebApp) tgWebApp.close(); } catch(e) {}
+  }, 1200);
+}
+
+function markError(btn, msg) {
+  btn.disabled = false;
+  btn.textContent = msg || '⚠️ Ошибка — попробуй ещё раз';
+}
+
+async function submitResults() {
+  var btn = document.getElementById('submitBtn');
+  var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  var initData = tgWebApp && tgWebApp.initData ? tgWebApp.initData : '';
+  var payload = buildPayload();
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Отправляем…';
+
+  // 1) Основной путь: HTTP API бота с подписью initData — работает независимо от способа открытия.
+  if (CIA_API_URL && initData) {
+    try {
+      var resp = await fetch(CIA_API_URL + '/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': initData,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        markSuccess(btn, tgWebApp);
+        return;
+      }
+      console.warn('API submit returned', resp.status);
+    } catch (e) {
+      console.warn('API submit failed', e);
+    }
+  }
+
+  // 2) Фолбэк: sendData — работает только из Reply-кнопки, но пробуем на всякий случай.
+  if (tgWebApp && typeof tgWebApp.sendData === 'function') {
+    try {
+      tgWebApp.sendData(JSON.stringify(payload));
+      markSuccess(btn, tgWebApp);
+      return;
+    } catch (e) {
+      console.error('sendData failed', e);
+    }
+  }
+
+  // 3) Не вышло — честно говорим пользователю.
+  markError(btn, '⚠️ Не удалось отправить. Проверь интернет и попробуй ещё раз.');
+}
 // Init
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {

@@ -22,14 +22,19 @@ ENV:
 """
 import asyncio
 import csv
+import hashlib
+import hmac
 import io
 import json
 import logging
 import os
 import sqlite3
+import urllib.parse
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import aiohttp
+from aiohttp import web
 import aiosqlite
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
@@ -391,6 +396,140 @@ async def send_admin_log(user, results, pattern, verdict, airtable_id):
         )
 
 
+# ─── submission pipeline (общая для sendData и HTTP API) ──────────────────
+async def process_submission(user, results: dict, manual_username: str,
+                             raw_payload: dict, source: str = "webapp"):
+    """user: объект с полями id/username/first_name/last_name.
+    Пишет в БД, Airtable, шлёт кандидату и админу. Возвращает dict-результат."""
+    pattern = int(results.get("pattern") or 0)
+
+    verdict = (
+        "Auto-Reject" if pattern == 1 else
+        "Priority (P5)" if pattern == 5 else
+        "Auto-Accept" if pattern in (2, 3, 4) else
+        "Manual Override"
+    )
+    link_sent = pattern in (2, 3, 4, 5)
+
+    # SQLite
+    try:
+        await db_insert(user, results, manual_username, pattern,
+                        verdict, link_sent, raw_payload)
+    except Exception as e:
+        log.error("SQLite insert failed: %s", e)
+
+    # Airtable (опционально)
+    fields = build_airtable_fields(user, results, manual_username,
+                                   pattern, verdict, link_sent, raw_payload)
+    airtable_id = None
+    try:
+        airtable_id = await airtable_create(fields)
+    except Exception as e:
+        log.error("Airtable write failed: %s", e)
+
+    # Кандидату — персональный вердикт
+    try:
+        await send_to_candidate(user.id, pattern)
+    except Exception as e:
+        log.error("Candidate message failed (id=%s): %s", user.id, e)
+
+    # Админу — лог
+    try:
+        await send_admin_log(user, results, pattern, verdict, airtable_id)
+    except Exception as e:
+        log.error("Admin log failed: %s", e)
+
+    log.info("Submission processed: user=%s pattern=%s verdict=%s src=%s",
+             user.id, pattern, verdict, source)
+    return {"ok": True, "pattern": pattern, "verdict": verdict,
+            "link_sent": link_sent,
+            "course_url": COURSE_URL if link_sent else None}
+
+
+# ─── Telegram initData validation ────────────────────────────────────────
+def verify_init_data(init_data: str) -> dict | None:
+    """Проверяет подпись Telegram initData (HMAC-SHA256 по bot_token).
+    Возвращает user-dict или None если подпись невалидна/данных нет."""
+    if not init_data:
+        return None
+    try:
+        parsed = urllib.parse.parse_qs(init_data, strict_parsing=True,
+                                       keep_blank_values=True)
+    except Exception:
+        return None
+    pairs = {k: v[0] for k, v in parsed.items()}
+    recv_hash = pairs.pop("hash", None)
+    if not recv_hash:
+        return None
+    data_check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs.keys()))
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(),
+                          hashlib.sha256).digest()
+    computed = hmac.new(secret_key, data_check.encode(),
+                        hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, recv_hash):
+        log.warning("initData hash mismatch")
+        return None
+    user_raw = pairs.get("user")
+    if not user_raw:
+        return None
+    try:
+        return json.loads(user_raw)
+    except Exception:
+        return None
+
+
+# ─── HTTP API (aiohttp) ───────────────────────────────────────────────────
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+    "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
+}
+
+
+async def http_submit(request: web.Request) -> web.Response:
+    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    u = verify_init_data(init_data)
+    if not u:
+        return web.json_response({"ok": False, "error": "bad_init_data"},
+                                 status=401, headers=CORS_HEADERS)
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "bad_json"},
+                                 status=400, headers=CORS_HEADERS)
+
+    results = payload.get("results", {}) or {}
+    manual_username = (payload.get("manual_username") or "").strip().lstrip("@")
+
+    user = SimpleNamespace(
+        id=int(u.get("id")),
+        username=u.get("username") or "",
+        first_name=u.get("first_name") or "",
+        last_name=u.get("last_name") or "",
+    )
+    result = await process_submission(user, results, manual_username,
+                                      payload, source="http")
+    return web.json_response(result, headers=CORS_HEADERS)
+
+
+async def http_options(request: web.Request) -> web.Response:
+    return web.Response(status=204, headers=CORS_HEADERS)
+
+
+async def http_health(request: web.Request) -> web.Response:
+    return web.json_response({"ok": True, "service": "ci-academy-bot"},
+                             headers=CORS_HEADERS)
+
+
+def build_web_app() -> web.Application:
+    app = web.Application()
+    app.router.add_post("/api/submit", http_submit)
+    app.router.add_options("/api/submit", http_options)
+    app.router.add_get("/health", http_health)
+    app.router.add_get("/", http_health)
+    return app
+
+
 # ─── main handler ───────────────────────────────────────────────────────────
 @dp.message(F.web_app_data)
 async def handle_webapp_data(message: types.Message):
@@ -403,48 +542,18 @@ async def handle_webapp_data(message: types.Message):
         return
 
     results = payload.get("results", {}) or {}
-    pattern = int(results.get("pattern") or 0)
     manual_username = (payload.get("manual_username") or "").strip().lstrip("@")
 
-    verdict = (
-        "Auto-Reject" if pattern == 1 else
-        "Priority (P5)" if pattern == 5 else
-        "Auto-Accept" if pattern in (2, 3, 4) else
-        "Manual Override"
-    )
-    link_sent = pattern in (2, 3, 4, 5)
-
-    # 1a) SQLite (всегда пишется — это наш primary storage)
-    try:
-        await db_insert(user, results, manual_username, pattern,
-                        verdict, link_sent, payload)
-    except Exception as e:
-        log.error("SQLite insert failed: %s", e)
-
-    # 1b) Airtable (опционально)
-    fields = build_airtable_fields(user, results, manual_username,
-                                   pattern, verdict, link_sent, payload)
-    airtable_id = None
-    try:
-        airtable_id = await airtable_create(fields)
-    except Exception as e:
-        log.error("Airtable write failed: %s", e)
-
-    # 2) Кандидату — персональное сообщение + убираем reply-клавиатуру
     try:
         await message.answer(
             "✅ Результаты получены. Секунду — формируем вердикт…",
             reply_markup=ReplyKeyboardRemove(),
         )
-        await send_to_candidate(user.id, pattern)
-    except Exception as e:
-        log.error("Candidate message failed: %s", e)
+    except Exception:
+        pass
 
-    # 3) Админу — полный лог
-    try:
-        await send_admin_log(user, results, pattern, verdict, airtable_id)
-    except Exception as e:
-        log.error("Admin log failed: %s", e)
+    await process_submission(user, results, manual_username, payload,
+                             source="sendData")
 
 
 # ─── override ───────────────────────────────────────────────────────────────
@@ -563,7 +672,20 @@ async def main():
         await db_init()
     except Exception as e:
         log.error("DB init failed: %s", e)
-    await dp.start_polling(bot, skip_updates=True)
+
+    # HTTP API — для Mini App, которая не может sendData (Menu Button / прямая ссылка).
+    port = int(os.getenv("PORT", "8080"))
+    app = build_web_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    log.info("HTTP API запущен на 0.0.0.0:%s", port)
+
+    try:
+        await dp.start_polling(bot, skip_updates=True)
+    finally:
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
