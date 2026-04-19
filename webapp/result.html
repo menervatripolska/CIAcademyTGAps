@@ -46,7 +46,7 @@
       to { opacity: 0; visibility: hidden; pointer-events: none; }
     }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css?v=1776561506">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776587158">
   <style>
     .result-block { display: none; }
     .result-block.visible { display: block; }
@@ -408,11 +408,11 @@ function submitResults() {
   var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
 
   // Без Telegram WebApp отправлять некуда
-  if (\!tgWebApp || typeof tgWebApp.sendData \!== 'function') {
+  if (!tgWebApp || typeof tgWebApp.sendData !== 'function') {
     btn.disabled = true;
     btn.textContent = '⚠️ Открой через кнопку в чате';
     var hint = document.getElementById('submitHint');
-    if (\!hint) {
+    if (!hint) {
       hint = document.createElement('div');
       hint.id = 'submitHint';
       hint.style.cssText = 'margin-top:14px;padding:14px 16px;border:1px solid rgba(0,212,170,0.35);background:rgba(0,212,170,0.08);border-radius:12px;color:#ece9f1;font-size:14px;line-height:1.5;';
