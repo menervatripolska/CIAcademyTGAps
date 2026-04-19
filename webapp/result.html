@@ -7,15 +7,17 @@
     <style id="splash-inline">
     /* Мгновенный сплэш: перекрывает всё до загрузки основного CSS — чтобы не мелькал doctype/сырой HTML */
     html, body { background:#0c0b14; color:#ece9f1; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    body { visibility: hidden; animation: cia-force-show 3s steps(1,end) forwards; }
-    @keyframes cia-force-show { to { visibility: visible; } }
+    /* body всегда видима — сплэш сам перекроет её пока грузится */
     #ciaSplash {
       position: fixed; inset: 0; z-index: 2147483647;
       background: radial-gradient(circle at 50% 40%, #1a1430 0%, #0c0b14 70%);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       visibility: visible;
-      transition: opacity .35s ease;
+      /* CSS-only fail-safe: сплэш сам гаснет и убирается, даже если JS не отработает */
+      animation: cia-splash-out 0.6s ease 2.8s forwards, cia-splash-kill 0s linear 3.4s forwards;
     }
+    @keyframes cia-splash-out { to { opacity: 0; } }
+    @keyframes cia-splash-kill { to { visibility: hidden; pointer-events: none; display: none; } }
     #ciaSplash .s-logo {
       width: 104px; height: 104px;
       display: flex; align-items: center; justify-content: center;
@@ -37,8 +39,14 @@
     }
     body.is-ready { visibility: visible; }
     body.is-ready #ciaSplash { opacity: 0; pointer-events: none; }
+      /* Пуленепробиваемый CSS fail-safe: даже если JS вообще не отработает,
+       splash уедет через 3 секунды. */
+    #ciaSplash { animation: ciaSplashHide 0.4s ease 3s forwards; }
+    @keyframes ciaSplashHide {
+      to { opacity: 0; visibility: hidden; pointer-events: none; }
+    }
   </style>
-  <link rel="stylesheet" href="css/kryptan.css?v=1776560979">
+  <link rel="stylesheet" href="css/kryptan.css?v=1776561506">
   <style>
     .result-block { display: none; }
     .result-block.visible { display: block; }
@@ -479,5 +487,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 800);
 });
 </script>
+  <script>
+    (function(){
+      function hideSplash(){
+        document.body.classList.add('is-ready');
+        var el = document.getElementById('ciaSplash');
+        if (el && el.parentNode) {
+          setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+        }
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(hideSplash, 80);
+      } else {
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(hideSplash, 80); });
+      }
+      // Жёсткий fail-safe: убрать splash через 2.5с что бы ни случилось
+      setTimeout(hideSplash, 2500);
+    })();
+  </script>
 </body>
 </html>
