@@ -5,7 +5,11 @@ import json
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import (
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton, KeyboardButtonRequestUser,
+    WebAppInfo, ReplyKeyboardRemove,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -30,12 +34,20 @@ PATTERN_NAMES = {
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text="⚡ Пройти вступительный отбор",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]])
+    # ВАЖНО: tg.sendData() работает ТОЛЬКО из reply-keyboard (KeyboardButton),
+    # из inline-кнопки и Menu Button — нет. Поэтому даём reply-кнопку.
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[
+            KeyboardButton(
+                text="⚡ Пройти вступительный отбор",
+                web_app=WebAppInfo(url=WEBAPP_URL),
+            )
+        ]],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        is_persistent=True,
+        input_field_placeholder="Нажми кнопку ниже ⬇️",
+    )
 
     await message.answer(
         "🦄 <b>CI Academy</b>\n\n"
@@ -49,7 +61,7 @@ async def cmd_start(message: types.Message):
         "🔭 Профориентирование — интересы и способности\n"
         "⚖️ Толерантность к неопределённости\n\n"
         "⏱ ~40 минут. Отвечай честно — это в твоих интересах.\n\n"
-        "Нажми кнопку, чтобы начать:",
+        "Нажми кнопку ниже, чтобы начать:",
         reply_markup=kb,
         parse_mode="HTML"
     )

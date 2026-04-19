@@ -4,6 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Вердикт Академии — Crypto Intelligence Academy</title>
+    <style id="splash-inline">
+    /* Мгновенный сплэш: перекрывает всё до загрузки основного CSS — чтобы не мелькал doctype/сырой HTML */
+    html, body { background:#0c0b14; color:#ece9f1; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { visibility: hidden; }
+    #ciaSplash {
+      position: fixed; inset: 0; z-index: 2147483647;
+      background: radial-gradient(circle at 50% 40%, #1a1430 0%, #0c0b14 70%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      visibility: visible;
+      transition: opacity .35s ease;
+    }
+    #ciaSplash .s-logo {
+      width: 88px; height: 88px; border-radius: 22px;
+      background: linear-gradient(135deg, #9945ff, #00d4aa);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 40px rgba(153,69,255,.45), 0 0 80px rgba(0,212,170,.25);
+      font-size: 48px; line-height: 1;
+      animation: s-pulse 2.4s ease-in-out infinite;
+    }
+    #ciaSplash .s-title {
+      margin-top: 18px; font-weight: 800; letter-spacing: .25em; font-size: 14px;
+      background: linear-gradient(90deg, #9945ff, #00d4aa);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    #ciaSplash .s-sub {
+      margin-top: 6px; font-size: 12px; color: #8a8599; letter-spacing: .08em;
+    }
+    @keyframes s-pulse {
+      0%,100% { transform: scale(1); box-shadow: 0 0 40px rgba(153,69,255,.45), 0 0 80px rgba(0,212,170,.25); }
+      50%     { transform: scale(1.05); box-shadow: 0 0 60px rgba(153,69,255,.65), 0 0 120px rgba(0,212,170,.45); }
+    }
+    body.is-ready { visibility: visible; }
+    body.is-ready #ciaSplash { opacity: 0; pointer-events: none; }
+  </style>
   <link rel="stylesheet" href="css/kryptan.css">
   <style>
     .result-block { display: none; }
@@ -93,6 +127,12 @@
   </style>
 </head>
 <body>
+  <div id="ciaSplash" role="status" aria-live="polite">
+    <div class="s-logo">🦄</div>
+    <div class="s-title">CI ACADEMY</div>
+    <div class="s-sub">Загружаем систему отбора…</div>
+  </div>
+
 <div class="page-wrap">
 
   <!-- Loading state -->
@@ -116,7 +156,7 @@
 
     <div class="result-header">
       <div class="ka-logo" style="justify-content:center;margin-bottom:16px;">
-        <div class="ka-logo-icon">CI</div>
+        <div class="ka-logo-icon" aria-label="CI Academy"><span class="ka-logo-unicorn">🦄</span></div>
         <span class="ka-logo-text">CI Academy</span>
       </div>
       <h1 class="result-title">Твои результаты</h1>
@@ -312,8 +352,17 @@ function submitResults() {
   var tgWebApp = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
 
   // Без Telegram WebApp отправлять некуда
-  if (!tgWebApp || typeof tgWebApp.sendData !== 'function') {
-    btn.textContent = '⚠️ Открой страницу через Telegram-бота';
+  if (\!tgWebApp || typeof tgWebApp.sendData \!== 'function') {
+    btn.disabled = true;
+    btn.textContent = '⚠️ Открой через кнопку в чате';
+    var hint = document.getElementById('submitHint');
+    if (\!hint) {
+      hint = document.createElement('div');
+      hint.id = 'submitHint';
+      hint.style.cssText = 'margin-top:14px;padding:14px 16px;border:1px solid rgba(0,212,170,0.35);background:rgba(0,212,170,0.08);border-radius:12px;color:#ece9f1;font-size:14px;line-height:1.5;';
+      hint.innerHTML = 'Чтобы отправить результаты в Академию, открой мини-апп через кнопку <b>«⚡ Пройти вступительный отбор»</b> на нижней клавиатуре в чате с ботом. Через Menu Button (синяя кнопка слева внизу) или прямую ссылку отправка заблокирована Telegram.';
+      btn.parentNode.insertBefore(hint, btn.nextSibling);
+    }
     return;
   }
 

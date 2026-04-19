@@ -125,18 +125,38 @@ body::after {
 }
 
 .ka-logo-icon {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   background: linear-gradient(135deg, var(--neon-purple), var(--neon-green));
-  border-radius: 14px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-title);
-  font-weight: 900;
-  font-size: 20px;
-  color: white;
-  box-shadow: var(--purple-glow);
+  box-shadow: var(--purple-glow), 0 0 28px rgba(0, 212, 170, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.ka-logo-icon::before {
+  /* мягкое внутреннее свечение */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), transparent 60%);
+  pointer-events: none;
+}
+
+.ka-logo-unicorn {
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45));
+  display: inline-block;
+  animation: unicorn-float 4s ease-in-out infinite;
+}
+
+@keyframes unicorn-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-2px) rotate(3deg); }
 }
 
 .ka-logo-text {
