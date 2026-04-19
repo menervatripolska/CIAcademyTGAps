@@ -97,8 +97,59 @@ async def db_init():
             "CREATE INDEX IF NOT EXISTS idx_pattern ON applicants(pattern)")
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_user ON applicants(tg_user_id)")
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                blocked INTEGER DEFAULT 0
+            )
+        ''')
         await db.commit()
     log.info("SQLite готова: %s", DB_PATH)
+
+
+async def db_log_user(user):
+    """Логируем каждого кто пишет боту — upsert."""
+    if not user or not user.id:
+        return
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('''
+            INSERT INTO users (user_id, username, first_name, last_name, first_seen, last_seen)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username=excluded.username,
+                first_name=excluded.first_name,
+                last_name=excluded.last_name,
+                last_seen=excluded.last_seen,
+                blocked=0
+        ''', (
+            user.id,
+            (user.username or "").lstrip("@"),
+            user.first_name or "",
+            user.last_name or "",
+            now, now,
+        ))
+        await db.commit()
+
+
+async def db_mark_blocked(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET blocked=1 WHERE user_id=?", (user_id,))
+        await db.commit()
+
+
+async def db_all_user_ids() -> list[int]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT user_id FROM users WHERE blocked=0 ORDER BY first_seen"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [r[0] for r in rows]
 
 
 async def db_insert(user, results, manual_username, pattern, verdict,
@@ -178,6 +229,24 @@ async def db_stats() -> dict:
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+
+# ─── middleware: логируем каждого юзера, кто пишет боту ──────────────────
+@dp.update.outer_middleware()
+async def user_logger_middleware(handler, event, data):
+    try:
+        u = None
+        msg = getattr(event, 'message', None)
+        cb = getattr(event, 'callback_query', None)
+        if msg and msg.from_user:
+            u = msg.from_user
+        elif cb and cb.from_user:
+            u = cb.from_user
+        if u and not u.is_bot:
+            await db_log_user(u)
+    except Exception as e:
+        log.warning("db_log_user failed: %s", e)
+    return await handler(event, data)
 
 # ─── pattern metadata ───────────────────────────────────────────────────────
 PATTERN_NAMES = {
@@ -614,6 +683,7 @@ async def cmd_admin(message: types.Message):
         "/admin — эта панель\n"
         "/stats — сколько кандидатов по паттернам\n"
         "/export — скачать CSV со всеми кандидатами\n"
+        "/broadcast — рассылка всем подписчикам (reply на сообщение)\n"
         "/id — твой Telegram id",
         parse_mode="HTML",
         disable_web_page_preview=True,
@@ -663,6 +733,124 @@ async def cmd_stats(message: types.Message):
         emoji = {1: "🔴", 2: "🟠", 3: "🔵", 4: "🟢", 5: "⚡"}[p]
         lines.append(f"{emoji} Паттерн {p}: {c}")
     await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+# ─── broadcast (/broadcast reply-на-сообщение → шлём всем) ────────────
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+
+_pending_broadcast: dict[int, int] = {}  # admin_id → msg_id ожидающий подтверждения
+
+
+@dp.message(Command("broadcast"))
+async def cmd_broadcast(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    if not message.reply_to_message:
+        await message.answer(
+            "📣 <b>Как разослать сообщение всем подписчикам бота:</b>\n\n"
+            "1. Напиши в этот чат нужное сообщение (можно с фото/видео).\n"
+            "2. Ответь на это сообщение командой <code>/broadcast</code>.\n"
+            "3. Бот покажет сколько людей в базе и попросит подтвердить.\n\n"
+            "💡 Ссылку на курс просто включи в текст: "
+            f"<code>{COURSE_URL}</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    user_ids = await db_all_user_ids()
+    n = len(user_ids)
+    if n == 0:
+        await message.answer("В базе пока нет подписчиков.")
+        return
+
+    _pending_broadcast[message.from_user.id] = message.reply_to_message.message_id
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[[
+        types.InlineKeyboardButton(
+            text=f"📨 Да, разослать {n} людям",
+            callback_data=f"bcast_go:{message.reply_to_message.message_id}"
+        ),
+        types.InlineKeyboardButton(
+            text="❌ Отмена", callback_data="bcast_cancel"
+        ),
+    ]])
+    await message.answer(
+        f"Разослать это сообщение <b>{n}</b> подписчикам?\n\n"
+        f"Сообщение будет скопировано 1-в-1 (текст + медиа).\n"
+        f"Отправка займёт ~{max(1, n // 25)} сек.",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+@dp.callback_query(F.data == "bcast_cancel")
+async def cb_bcast_cancel(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        return
+    _pending_broadcast.pop(cb.from_user.id, None)
+    await cb.message.edit_text("❌ Рассылка отменена.")
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("bcast_go:"))
+async def cb_bcast_go(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("Нет доступа", show_alert=True)
+        return
+    src_msg_id = int(cb.data.split(":", 1)[1])
+    user_ids = await db_all_user_ids()
+    total = len(user_ids)
+    await cb.message.edit_text(f"📨 Рассылаю {total} подписчикам…")
+    await cb.answer()
+
+    sent, failed, blocked = 0, 0, 0
+    for i, uid in enumerate(user_ids, 1):
+        try:
+            await bot.copy_message(
+                chat_id=uid,
+                from_chat_id=cb.message.chat.id,
+                message_id=src_msg_id,
+            )
+            sent += 1
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+            try:
+                await bot.copy_message(chat_id=uid,
+                                       from_chat_id=cb.message.chat.id,
+                                       message_id=src_msg_id)
+                sent += 1
+            except Exception as e2:
+                log.warning("broadcast retry fail %s: %s", uid, e2)
+                failed += 1
+        except TelegramForbiddenError:
+            blocked += 1
+            try:
+                await db_mark_blocked(uid)
+            except Exception:
+                pass
+        except Exception as e:
+            log.warning("broadcast fail uid=%s: %s", uid, e)
+            failed += 1
+        # throttle: ~25 msg/sec — ниже лимита Telegram 30/sec
+        await asyncio.sleep(0.04)
+        # прогресс каждые 50
+        if i % 50 == 0:
+            try:
+                await cb.message.edit_text(
+                    f"📨 Рассылаю… {i}/{total}\n"
+                    f"✅ {sent} | 🚫 заблок: {blocked} | ⚠️ ошибки: {failed}"
+                )
+            except Exception:
+                pass
+
+    _pending_broadcast.pop(cb.from_user.id, None)
+    await cb.message.edit_text(
+        f"✅ <b>Рассылка завершена</b>\n\n"
+        f"Всего: {total}\n"
+        f"Доставлено: <b>{sent}</b>\n"
+        f"Заблокировали бота: {blocked}\n"
+        f"Ошибки: {failed}",
+        parse_mode="HTML",
+    )
 
 
 # ─── main ───────────────────────────────────────────────────────────────────
