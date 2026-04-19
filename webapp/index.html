@@ -16,13 +16,12 @@
       transition: opacity .35s ease;
     }
     #ciaSplash .s-logo {
-      width: 88px; height: 88px; border-radius: 22px;
-      background: linear-gradient(135deg, #9945ff, #00d4aa);
+      width: 104px; height: 104px;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 40px rgba(153,69,255,.45), 0 0 80px rgba(0,212,170,.25);
-      font-size: 48px; line-height: 1;
+      filter: drop-shadow(0 0 22px rgba(167,139,250,0.55)) drop-shadow(0 0 40px rgba(6,182,212,0.35));
       animation: s-pulse 2.4s ease-in-out infinite;
     }
+    #ciaSplash .s-logo svg { width: 100%; height: 100%; }
     #ciaSplash .s-title {
       margin-top: 18px; font-weight: 800; letter-spacing: .25em; font-size: 14px;
       background: linear-gradient(90deg, #9945ff, #00d4aa);
@@ -32,8 +31,8 @@
       margin-top: 6px; font-size: 12px; color: #8a8599; letter-spacing: .08em;
     }
     @keyframes s-pulse {
-      0%,100% { transform: scale(1); box-shadow: 0 0 40px rgba(153,69,255,.45), 0 0 80px rgba(0,212,170,.25); }
-      50%     { transform: scale(1.05); box-shadow: 0 0 60px rgba(153,69,255,.65), 0 0 120px rgba(0,212,170,.45); }
+      0%,100% { transform: scale(1); opacity: 1; }
+      50%     { transform: scale(1.05); opacity: 0.95; }
     }
     body.is-ready { visibility: visible; }
     body.is-ready #ciaSplash { opacity: 0; pointer-events: none; }
@@ -133,7 +132,31 @@
 </head>
 <body>
   <div id="ciaSplash" role="status" aria-live="polite">
-    <div class="s-logo">🦄</div>
+    <div class="s-logo"><svg class="cia-logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="CI Academy">
+  <defs>
+    <linearGradient id="ciGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="ciGradSoft" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="ciGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#ciGradSoft)"/>
+  <rect x="3" y="3" width="58" height="58" rx="14" stroke="url(#ciGrad)" stroke-width="2" fill="none"/>
+  <\!-- C -->
+  <path d="M 26 22 A 10 10 0 1 0 26 42" stroke="url(#ciGrad)" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#ciGlow)"/>
+  <\!-- I: вертикальная ножка + два серифа -->
+  <rect x="40" y="20" width="4" height="24" rx="1.5" fill="url(#ciGrad)" filter="url(#ciGlow)"/>
+  <rect x="36" y="19" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+  <rect x="36" y="42.5" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+</svg></div>
     <div class="s-title">CI ACADEMY</div>
     <div class="s-sub">Загружаем систему отбора…</div>
   </div>
@@ -145,7 +168,31 @@
 
     <div class="ka-header">
       <div class="ka-logo">
-        <div class="ka-logo-icon" aria-label="CI Academy"><span class="ka-logo-unicorn">🦄</span></div>
+        <div class="ka-logo-icon" aria-label="CI Academy"><svg class="cia-logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="CI Academy">
+  <defs>
+    <linearGradient id="ciGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="ciGradSoft" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="ciGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#ciGradSoft)"/>
+  <rect x="3" y="3" width="58" height="58" rx="14" stroke="url(#ciGrad)" stroke-width="2" fill="none"/>
+  <\!-- C -->
+  <path d="M 26 22 A 10 10 0 1 0 26 42" stroke="url(#ciGrad)" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#ciGlow)"/>
+  <\!-- I: вертикальная ножка + два серифа -->
+  <rect x="40" y="20" width="4" height="24" rx="1.5" fill="url(#ciGrad)" filter="url(#ciGlow)"/>
+  <rect x="36" y="19" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+  <rect x="36" y="42.5" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+</svg></div>
         <span class="ka-logo-text">CI Academy</span>
       </div>
       <h1 class="ka-title"><span class="gradient-text">Вступительный</span><br>отбор</h1>
@@ -182,7 +229,31 @@
 
     <div class="ka-header" style="padding-top:24px;">
       <div class="ka-logo">
-        <div class="ka-logo-icon" aria-label="CI Academy"><span class="ka-logo-unicorn">🦄</span></div>
+        <div class="ka-logo-icon" aria-label="CI Academy"><svg class="cia-logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="CI Academy">
+  <defs>
+    <linearGradient id="ciGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="ciGradSoft" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="ciGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#ciGradSoft)"/>
+  <rect x="3" y="3" width="58" height="58" rx="14" stroke="url(#ciGrad)" stroke-width="2" fill="none"/>
+  <\!-- C -->
+  <path d="M 26 22 A 10 10 0 1 0 26 42" stroke="url(#ciGrad)" stroke-width="3.5" stroke-linecap="round" fill="none" filter="url(#ciGlow)"/>
+  <\!-- I: вертикальная ножка + два серифа -->
+  <rect x="40" y="20" width="4" height="24" rx="1.5" fill="url(#ciGrad)" filter="url(#ciGlow)"/>
+  <rect x="36" y="19" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+  <rect x="36" y="42.5" width="12" height="2.5" rx="1" fill="url(#ciGrad)"/>
+</svg></div>
         <span class="ka-logo-text">CI Academy</span>
       </div>
     </div>
