@@ -21,12 +21,16 @@ ENV:
   AIRTABLE_TABLE_ID   — tbl... id таблицы Applicants (default: tblpPcaIPEfVswjnK)
 """
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
+import sqlite3
 from datetime import datetime, timezone
 
 import aiohttp
+import aiosqlite
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
@@ -57,6 +61,115 @@ COURSE_URL = os.getenv("COURSE_URL", "https://ciacademy.kz")
 AIRTABLE_API_KEY = os.getenv("AIRTABLE_API_KEY")
 AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID", "appa0lbQ8SuQvc7aV")
 AIRTABLE_TABLE_ID = os.getenv("AIRTABLE_TABLE_ID", "tblpPcaIPEfVswjnK")
+
+# Локальная SQLite (на Railway — в /data если смонтирован volume; иначе рядом с ботом).
+DB_PATH = os.getenv("DB_PATH", "/data/applicants.db"
+                    if os.path.isdir("/data") else "applicants.db")
+
+
+async def db_init():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS applicants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tg_user_id INTEGER NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                pattern INTEGER,
+                verdict TEXT,
+                course_link_sent INTEGER DEFAULT 0,
+                holland_top TEXT,
+                gambling_score INTEGER,
+                hardiness_total INTEGER,
+                profori_spheres TEXT,
+                tolerance_score INTEGER,
+                raw_payload TEXT,
+                created_at TEXT
+            )
+        ''')
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pattern ON applicants(pattern)")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user ON applicants(tg_user_id)")
+        await db.commit()
+    log.info("SQLite готова: %s", DB_PATH)
+
+
+async def db_insert(user, results, manual_username, pattern, verdict,
+                    link_sent, raw_payload):
+    holland = results.get("holland") or {}
+    gambling = results.get("gambling") or {}
+    hardiness = results.get("hardiness") or {}
+    profori = results.get("proforientation") or {}
+    tolerance = results.get("tolerance") or {}
+    spheres = profori.get("topSpheres") or []
+    if isinstance(spheres, list):
+        spheres = ", ".join(str(x) for x in spheres)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            '''INSERT INTO applicants
+               (tg_user_id, username, first_name, last_name, pattern, verdict,
+                course_link_sent, holland_top, gambling_score, hardiness_total,
+                profori_spheres, tolerance_score, raw_payload, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (user.id,
+             (user.username or manual_username or "").lstrip("@"),
+             user.first_name or "",
+             user.last_name or "",
+             pattern,
+             verdict,
+             1 if link_sent else 0,
+             (holland.get("sortedTop3") or holland.get("topName") or "")[:120],
+             int(gambling.get("score") or 0),
+             int(hardiness.get("total") or 0),
+             spheres[:500],
+             int(tolerance.get("score") or 0),
+             json.dumps(raw_payload, ensure_ascii=False)[:50000],
+             datetime.now(timezone.utc).isoformat()))
+        await db.commit()
+    log.info("SQLite: +1 кандидат (id=%s, pattern=%s)", user.id, pattern)
+
+
+async def db_export_csv() -> tuple[bytes, int]:
+    '''Вернуть (csv_bytes, rows_count).'''
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+    w.writerow([
+        "id", "tg_user_id", "username", "first_name", "last_name",
+        "pattern", "verdict", "course_link_sent",
+        "holland_top", "gambling_score", "hardiness_total",
+        "profori_spheres", "tolerance_score", "created_at",
+    ])
+    count = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            '''SELECT id, tg_user_id, username, first_name, last_name,
+                      pattern, verdict, course_link_sent,
+                      holland_top, gambling_score, hardiness_total,
+                      profori_spheres, tolerance_score, created_at
+               FROM applicants ORDER BY id DESC''') as cur:
+            async for row in cur:
+                w.writerow(row); count += 1
+    return buf.getvalue().encode("utf-8-sig"), count
+
+
+async def db_stats() -> dict:
+    stats = {"total": 0, "by_pattern": {}, "accepted": 0, "rejected": 0}
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT pattern, COUNT(*) FROM applicants GROUP BY pattern"
+        ) as cur:
+            async for p, c in cur:
+                stats["by_pattern"][p] = c
+                stats["total"] += c
+                if p == 1:
+                    stats["rejected"] += c
+                elif p in (2, 3, 4, 5):
+                    stats["accepted"] += c
+    return stats
+
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -301,7 +414,14 @@ async def handle_webapp_data(message: types.Message):
     )
     link_sent = pattern in (2, 3, 4, 5)
 
-    # 1) Airtable
+    # 1a) SQLite (всегда пишется — это наш primary storage)
+    try:
+        await db_insert(user, results, manual_username, pattern,
+                        verdict, link_sent, payload)
+    except Exception as e:
+        log.error("SQLite insert failed: %s", e)
+
+    # 1b) Airtable (опционально)
     fields = build_airtable_fields(user, results, manual_username,
                                    pattern, verdict, link_sent, payload)
     airtable_id = None
@@ -381,8 +501,10 @@ async def cmd_admin(message: types.Message):
         f"<b>Курс URL:</b> {COURSE_URL}\n"
         f"<b>WebApp URL:</b> {WEBAPP_URL}\n\n"
         f"📊 <a href='{at_link}'>Таблица кандидатов</a>\n\n"
-        "Команды:\n"
+        "<b>Команды:</b>\n"
         "/admin — эта панель\n"
+        "/stats — сколько кандидатов по паттернам\n"
+        "/export — скачать CSV со всеми кандидатами\n"
         "/id — твой Telegram id",
         parse_mode="HTML",
         disable_web_page_preview=True,
@@ -395,9 +517,52 @@ async def cmd_id(message: types.Message):
                          parse_mode="HTML")
 
 
+@dp.message(Command("export"))
+async def cmd_export(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    try:
+        data, n = await db_export_csv()
+    except Exception as e:
+        await message.answer(f"Ошибка экспорта: {e}")
+        return
+    if n == 0:
+        await message.answer("Пока никто не прошёл тест.")
+        return
+    ts = datetime.now().strftime("%Y-%m-%d_%H%M")
+    fname = f"ci_academy_applicants_{ts}.csv"
+    await message.answer_document(
+        types.BufferedInputFile(data, filename=fname),
+        caption=f"📊 Кандидаты: {n} шт.\nФормат: UTF-8 CSV (открывается в Excel).")
+
+
+@dp.message(Command("stats"))
+async def cmd_stats(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    stats = await db_stats()
+    if stats["total"] == 0:
+        await message.answer("Пока никто не прошёл тест.")
+        return
+    lines = ["📊 <b>Статистика отбора</b>\n",
+             f"Всего кандидатов: <b>{stats['total']}</b>",
+             f"✅ Принято (2-5): <b>{stats['accepted']}</b>",
+             f"❌ Отказано (1): <b>{stats['rejected']}</b>",
+             ""]
+    for p in (1, 2, 3, 4, 5):
+        c = stats["by_pattern"].get(p, 0)
+        emoji = {1: "🔴", 2: "🟠", 3: "🔵", 4: "🟢", 5: "⚡"}[p]
+        lines.append(f"{emoji} Паттерн {p}: {c}")
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
 # ─── main ───────────────────────────────────────────────────────────────────
 async def main():
     log.info("Starting CI Academy Bot… (admin=%s, course=%s)", ADMIN_ID, COURSE_URL)
+    try:
+        await db_init()
+    except Exception as e:
+        log.error("DB init failed: %s", e)
     await dp.start_polling(bot, skip_updates=True)
 
 
