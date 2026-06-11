@@ -39,6 +39,7 @@ import aiosqlite
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -1254,6 +1255,16 @@ async def main():
         await db_init()
     except Exception as e:
         log.error("DB init failed: %s", e)
+
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        await bot.set_my_commands([
+            BotCommand(command="start", description="Запустить диагностику"),
+            BotCommand(command="id", description="Показать Telegram ID"),
+        ])
+        log.info("Telegram webhook очищен, команды меню обновлены")
+    except Exception as e:
+        log.warning("Telegram bootstrap failed: %s", e)
 
     # HTTP API — для Mini App, которая не может sendData (Menu Button / прямая ссылка).
     port = int(os.getenv("PORT", "8080"))
