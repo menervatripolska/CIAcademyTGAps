@@ -37,7 +37,7 @@ import aiohttp
 from aiohttp import web
 import aiosqlite
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -70,6 +70,10 @@ AIRTABLE_TABLE_ID = os.getenv("AIRTABLE_TABLE_ID", "tblpPcaIPEfVswjnK")
 # Локальная SQLite (на Railway — в /data если смонтирован volume; иначе рядом с ботом).
 DB_PATH = os.getenv("DB_PATH", "/data/applicants.db"
                     if os.path.isdir("/data") else "applicants.db")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 async def db_init():
@@ -105,9 +109,44 @@ async def db_init():
                 last_name TEXT,
                 first_seen TEXT,
                 last_seen TEXT,
+                source_payload TEXT,
+                intent TEXT,
+                funnel_stage TEXT DEFAULT 'seen',
+                last_event_at TEXT,
+                course_clicked_at TEXT,
                 blocked INTEGER DEFAULT 0
             )
         ''')
+        # Backward-compatible migrations for existing Railway/SQLite volumes.
+        for col, ddl in {
+            "source_payload": "TEXT",
+            "intent": "TEXT",
+            "funnel_stage": "TEXT DEFAULT 'seen'",
+            "last_event_at": "TEXT",
+            "course_clicked_at": "TEXT",
+        }.items():
+            try:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e).lower():
+                    raise
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id)")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_stage ON users(funnel_stage)")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_intent ON users(intent)")
         await db.commit()
     log.info("SQLite готова: %s", DB_PATH)
 
@@ -116,7 +155,7 @@ async def db_log_user(user):
     """Логируем каждого кто пишет боту — upsert."""
     if not user or not user.id:
         return
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = now_iso()
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
             INSERT INTO users (user_id, username, first_name, last_name, first_seen, last_seen)
@@ -134,6 +173,54 @@ async def db_log_user(user):
             user.last_name or "",
             now, now,
         ))
+        await db.commit()
+
+
+async def db_update_funnel(user_id: int, stage: str | None = None,
+                           intent: str | None = None,
+                           source_payload: str | None = None,
+                           course_clicked: bool = False):
+    now = now_iso()
+    sets = ["last_event_at=?"]
+    vals = [now]
+    if stage:
+        sets.append("funnel_stage=?")
+        vals.append(stage)
+    if intent:
+        sets.append("intent=?")
+        vals.append(intent)
+    if source_payload:
+        sets.append("source_payload=COALESCE(NULLIF(source_payload, ''), ?)")
+        vals.append(source_payload[:240])
+    if course_clicked:
+        sets.append("course_clicked_at=?")
+        vals.append(now)
+    vals.append(user_id)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(f"UPDATE users SET {', '.join(sets)} WHERE user_id=?",
+                         vals)
+        await db.commit()
+
+
+async def db_log_event(user_id: int, event_type: str, payload: dict | None = None,
+                       stage: str | None = None):
+    now = now_iso()
+    payload_text = json.dumps(payload or {}, ensure_ascii=False)[:20000]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO events (user_id, event_type, payload, created_at) VALUES (?,?,?,?)",
+            (user_id, event_type, payload_text, now),
+        )
+        if stage:
+            await db.execute(
+                "UPDATE users SET funnel_stage=?, last_event_at=? WHERE user_id=?",
+                (stage, now, user_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE users SET last_event_at=? WHERE user_id=?",
+                (now, user_id),
+            )
         await db.commit()
 
 
@@ -227,6 +314,41 @@ async def db_stats() -> dict:
     return stats
 
 
+async def db_funnel_stats() -> dict:
+    stats = {
+        "users_total": 0,
+        "by_stage": {},
+        "by_intent": {},
+        "events": {},
+        "course_clicked": 0,
+    }
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM users") as cur:
+            row = await cur.fetchone()
+            stats["users_total"] = row[0] if row else 0
+        async with db.execute(
+            "SELECT COALESCE(funnel_stage, 'seen'), COUNT(*) FROM users GROUP BY COALESCE(funnel_stage, 'seen')"
+        ) as cur:
+            async for stage, count in cur:
+                stats["by_stage"][stage] = count
+        async with db.execute(
+            "SELECT COALESCE(intent, 'not_selected'), COUNT(*) FROM users GROUP BY COALESCE(intent, 'not_selected')"
+        ) as cur:
+            async for intent, count in cur:
+                stats["by_intent"][intent] = count
+        async with db.execute(
+            "SELECT event_type, COUNT(*) FROM events GROUP BY event_type"
+        ) as cur:
+            async for event_type, count in cur:
+                stats["events"][event_type] = count
+        async with db.execute(
+            "SELECT COUNT(*) FROM users WHERE course_clicked_at IS NOT NULL"
+        ) as cur:
+            row = await cur.fetchone()
+            stats["course_clicked"] = row[0] if row else 0
+    return stats
+
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -273,37 +395,128 @@ PATTERN_SLOT = {
     4: "готовность действовать и держать позицию даже в просадке",
 }
 
+INTENT_LABELS = {
+    "newbie": "Я новичок, хочу понять крипту",
+    "chaos": "Уже покупал, но хаос в голове",
+    "system": "Хочу DCA/Grid и систему",
+    "trading": "Хочу понять, подходит ли трейдинг",
+}
+
+
+def intent_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Новичок: хочу понять крипту", callback_data="intent:newbie")],
+        [InlineKeyboardButton(text="Уже покупал, но хаос", callback_data="intent:chaos")],
+        [InlineKeyboardButton(text="Хочу DCA/Grid и Crypto OS", callback_data="intent:system")],
+        [InlineKeyboardButton(text="Проверить себя для трейдинга", callback_data="intent:trading")],
+    ])
+
+
+def course_keyboard(pattern: int, context: str = "verdict") -> InlineKeyboardMarkup:
+    buy_text = "Получить безопасный маршрут" if pattern == 1 else "Забрать курс за $99"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=buy_text,
+            callback_data=f"course_open:{pattern}:{context}",
+        )],
+        [
+            InlineKeyboardButton(
+                text="Что внутри курса",
+                callback_data=f"course_info:{pattern}:{context}",
+            ),
+            InlineKeyboardButton(
+                text="Как оплатить",
+                callback_data=f"payment_help:{pattern}:{context}",
+            ),
+        ],
+        [InlineKeyboardButton(
+            text="Задать вопрос куратору",
+            callback_data=f"ask_curator:{pattern}:{context}",
+        )],
+    ])
+
+
+def tracked_course_url(pattern: int, context: str) -> str:
+    parsed = urllib.parse.urlparse(COURSE_URL)
+    query = urllib.parse.parse_qs(parsed.query)
+    query.update({
+        "utm_source": ["telegram_bot"],
+        "utm_medium": ["funnel"],
+        "utm_campaign": [f"pattern_{pattern}"],
+        "utm_content": [context],
+    })
+    return urllib.parse.urlunparse(parsed._replace(
+        query=urllib.parse.urlencode(query, doseq=True)
+    ))
+
 # ─── /start ─────────────────────────────────────────────────────────────────
 @dp.message(CommandStart())
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message, command: CommandObject):
+    source_payload = (command.args or "").strip() if command else ""
+    await db_update_funnel(message.from_user.id, stage="started",
+                           source_payload=source_payload or None)
+    await db_log_event(message.from_user.id, "start", {
+        "source_payload": source_payload,
+    }, stage="started")
+
     # sendData работает ТОЛЬКО из reply-keyboard — даём большую reply-кнопку.
     kb = ReplyKeyboardMarkup(
         keyboard=[[
             KeyboardButton(
-                text="⚡ Пройти вступительный отбор",
+                text="⚡ Открыть диагностику",
                 web_app=WebAppInfo(url=WEBAPP_URL),
             )
         ]],
         resize_keyboard=True,
         is_persistent=True,
-        input_field_placeholder="Нажми кнопку ниже ⬇️",
+        input_field_placeholder="Выбери вариант или открой диагностику",
     )
     await message.answer(
-        "🦄 <b>CI Academy</b>\n\n"
-        "Добро пожаловать в систему вступительного отбора.\n\n"
-        "Академия не берёт всех подряд. Нам нужны те, кто психологически готов "
-        "работать с реальными рисками крипто-рынка.\n\n"
-        "📋 <b>Тебя ждут 5 тестов:</b>\n"
-        "🎯 Тест Голланда — профессиональный тип\n"
-        "🎲 Склонность к азарту — риск-профиль\n"
-        "🛡️ Жизнестойкость — психологическая устойчивость\n"
-        "🔭 Профориентирование — интересы и способности\n"
-        "⚖️ Толерантность к неопределённости\n\n"
-        "⏱ ~40 минут. Отвечай честно — это в твоих интересах.\n\n"
-        "Нажми кнопку ниже, чтобы начать:",
+        "⚡ <b>CI Academy Selection</b>\n\n"
+        "Я помогу понять, какой у тебя сейчас крипто-режим: "
+        "безопасный старт, портфель, DCA/Grid или активная торговля.\n\n"
+        "Это не скучная анкета и не «экзамен на умного». "
+        "На выходе ты получишь:\n\n"
+        "• персональный профиль риска\n"
+        "• 3 действия на ближайшую неделю\n"
+        "• рекомендацию, как заходить в курс «Я — Криптан» и Crypto OS\n\n"
+        "Можно пройти быстро за <b>3 минуты</b> или открыть полный профиль "
+        "на 15–20 минут.\n\n"
+        "Сначала выбери, что ближе всего к твоей ситуации:",
         reply_markup=kb,
         parse_mode="HTML",
     )
+    await message.answer(
+        "С какой точки стартуем?",
+        reply_markup=intent_keyboard(),
+    )
+
+
+@dp.callback_query(F.data.startswith("intent:"))
+async def cb_intent(cb: types.CallbackQuery):
+    intent = cb.data.split(":", 1)[1]
+    label = INTENT_LABELS.get(intent, intent)
+    await db_update_funnel(cb.from_user.id, stage="intent_selected",
+                           intent=intent)
+    await db_log_event(cb.from_user.id, "intent_selected", {
+        "intent": intent,
+        "label": label,
+    }, stage="intent_selected")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="Открыть диагностику",
+            web_app=WebAppInfo(url=WEBAPP_URL),
+        )
+    ]])
+    await cb.message.answer(
+        f"Принял: <b>{label}</b>.\n\n"
+        "Жми «Открыть диагностику». Быстрый маршрут займёт около 3 минут: "
+        "я покажу твой режим, риски и следующий шаг. Если захочешь глубже — "
+        "после этого можно пройти полный профиль.",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+    await cb.answer("Сегмент сохранён")
 
 
 # ─── airtable ───────────────────────────────────────────────────────────────
@@ -370,12 +583,14 @@ async def send_to_candidate(chat_id: int, pattern: int):
             chat_id,
             "🛡️ <b>CI Academy — результат отбора</b>\n\n"
             "Спасибо, что прошёл тесты до конца — это уже о многом говорит.\n\n"
-            "По твоему психологическому профилю на данном этапе мы "
-            "<b>не открываем доступ к активным программам Академии</b>. "
-            "Это не про «плох/хорош», это про готовность работать с реальными "
-            "рисками крипто-рынка каждый день без предохранителей.\n\n"
-            "Повторный отбор возможен через <b>3 месяца</b>.",
+            "Сейчас активная торговля для тебя не самый безопасный маршрут. "
+            "Это не отказ от крипты — это рекомендация начать с защиты: "
+            "не гнаться за сигналами, не заходить в плечи и собрать простую "
+            "систему наблюдения за рынком.\n\n"
+            "Твой безопасный старт: база по BTC/ETH/SOL, DCA без эмоций, "
+            "лимиты риска и режим «сначала понять систему — потом действовать».",
             parse_mode="HTML",
+            reply_markup=course_keyboard(pattern),
         )
     elif pattern in (2, 3, 4):
         slot = PATTERN_SLOT[pattern]
@@ -387,10 +602,10 @@ async def send_to_candidate(chat_id: int, pattern: int):
             f"{slot}</b> — это важно для работы с рынком.\n\n"
             "Курс стартует по готовности — 8 уроков, своя Crypto OS, "
             "AI-ассистент, закрытое коммьюнити.\n\n"
-            f"👉 <b>Забрать доступ:</b> {COURSE_URL}\n\n"
-            "Если появятся вопросы — пиши прямо сюда.",
+            "Следующий шаг — посмотреть, что внутри курса и выбрать способ входа.",
             parse_mode="HTML",
             disable_web_page_preview=False,
+            reply_markup=course_keyboard(pattern),
         )
     elif pattern == 5:
         await bot.send_message(
@@ -402,16 +617,36 @@ async def send_to_candidate(chat_id: int, pattern: int):
             "ядро комьюнити CI Academy.\n\n"
             "Тебя ждёт приоритетный маршрут: персональный куратор, приглашение "
             "в закрытый круг, ранний доступ к Crypto OS.\n\n"
-            f"👉 <b>Войти в Академию:</b> {COURSE_URL}\n\n"
             "В ближайшие сутки с тобой свяжутся лично, чтобы обсудить детали.",
             parse_mode="HTML",
             disable_web_page_preview=False,
+            reply_markup=course_keyboard(pattern),
         )
     else:
         await bot.send_message(
             chat_id,
             "Результаты получены. Куратор свяжется с тобой в ближайшее время.",
         )
+
+
+async def send_quick_result_to_candidate(chat_id: int, quick: dict, pattern: int):
+    title = quick.get("title") or "Твой крипто-режим определён"
+    text = quick.get("text") or "Диагностика готова."
+    actions = quick.get("actions") or []
+    action_lines = "\n".join(f"• {a}" for a in actions[:3])
+    if action_lines:
+        action_lines = "\n\n<b>Что сделать на этой неделе:</b>\n" + action_lines
+    await bot.send_message(
+        chat_id,
+        "⚡ <b>Быстрая диагностика CI Academy</b>\n\n"
+        f"<b>{title}</b>\n\n"
+        f"{text}"
+        f"{action_lines}\n\n"
+        "Если хочешь собрать это в систему, курс «Я — Криптан» ведёт через "
+        "8 уроков, Crypto OS, DCA/Grid и практикум через 30 дней.",
+        parse_mode="HTML",
+        reply_markup=course_keyboard(pattern, "quick_result"),
+    )
 
 
 async def send_admin_log(user, results, pattern, verdict, airtable_id):
@@ -470,9 +705,12 @@ async def process_submission(user, results: dict, manual_username: str,
                              raw_payload: dict, source: str = "webapp"):
     """user: объект с полями id/username/first_name/last_name.
     Пишет в БД, Airtable, шлёт кандидату и админу. Возвращает dict-результат."""
+    await db_log_user(user)
     pattern = int(results.get("pattern") or 0)
+    is_quick = raw_payload.get("mode") == "quick" or bool(results.get("quick"))
 
     verdict = (
+        "Quick Lead" if is_quick else
         "Auto-Reject" if pattern == 1 else
         "Priority (P5)" if pattern == 5 else
         "Auto-Accept" if pattern in (2, 3, 4) else
@@ -498,7 +736,20 @@ async def process_submission(user, results: dict, manual_username: str,
 
     # Кандидату — персональный вердикт
     try:
-        await send_to_candidate(user.id, pattern)
+        event_type = "quick_result_submitted" if is_quick else "full_result_submitted"
+        stage = "quick_result" if is_quick else "full_result"
+        await db_log_event(user.id, event_type, {
+            "pattern": pattern,
+            "verdict": verdict,
+            "source": source,
+            "link_sent": link_sent,
+        }, stage=stage)
+        if is_quick:
+            await send_quick_result_to_candidate(
+                user.id, results.get("quick") or {}, pattern
+            )
+        else:
+            await send_to_candidate(user.id, pattern)
     except Exception as e:
         log.error("Candidate message failed (id=%s): %s", user.id, e)
 
@@ -625,6 +876,109 @@ async def handle_webapp_data(message: types.Message):
                              source="sendData")
 
 
+# ─── funnel CTA callbacks ──────────────────────────────────────────────────
+@dp.callback_query(F.data.startswith("course_open:"))
+async def cb_course_open(cb: types.CallbackQuery):
+    _, pattern_raw, context = cb.data.split(":", 2)
+    pattern = int(pattern_raw)
+    await db_update_funnel(cb.from_user.id, stage="course_clicked",
+                           course_clicked=True)
+    await db_log_event(cb.from_user.id, "course_clicked", {
+        "pattern": pattern,
+        "context": context,
+    }, stage="course_clicked")
+    url = tracked_course_url(pattern, context)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="Открыть ciacademy.kz", url=url)
+    ]])
+    if pattern == 1:
+        text = (
+            "Я открою страницу курса, но твой маршрут — не агрессивный трейдинг. "
+            "Смотри блоки про базу рынка, DCA, риск и Crypto OS как систему "
+            "наблюдения без эмоций."
+        )
+    else:
+        text = (
+            "Отлично. Ниже ссылка на курс «Я — Криптан»: 8 уроков, Crypto OS, "
+            "DCA/Grid, AI-ассистент и финальный практикум."
+        )
+    await cb.message.answer(text, reply_markup=kb)
+    await cb.answer("Клик записан")
+
+
+@dp.callback_query(F.data.startswith("course_info:"))
+async def cb_course_info(cb: types.CallbackQuery):
+    _, pattern_raw, context = cb.data.split(":", 2)
+    pattern = int(pattern_raw)
+    await db_log_event(cb.from_user.id, "course_info_viewed", {
+        "pattern": pattern,
+        "context": context,
+    }, stage="course_info_viewed")
+    await cb.message.answer(
+        "📦 <b>Что внутри «Я — Криптан»</b>\n\n"
+        "• 8 уроков: от базы денег/BTC/ETH/SOL до портфеля, риска и операционки\n"
+        "• Crypto OS: макро-режим, DCA-движок, Grid-стратегии, watchlist\n"
+        "• AI-ассистент Нова и чек-листы решений без эмоций\n"
+        "• Через 30 дней — 2-часовой практикум в Google Meet\n"
+        "• Цена первой волны: $99 ≈ 46 000 ₸",
+        parse_mode="HTML",
+        reply_markup=course_keyboard(pattern, "course_info"),
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("payment_help:"))
+async def cb_payment_help(cb: types.CallbackQuery):
+    _, pattern_raw, context = cb.data.split(":", 2)
+    pattern = int(pattern_raw)
+    await db_log_event(cb.from_user.id, "payment_help_viewed", {
+        "pattern": pattern,
+        "context": context,
+    }, stage="payment_help_viewed")
+    await cb.message.answer(
+        "💳 <b>Оплата</b>\n\n"
+        "На сайте доступны варианты под KZ/RU/международные карты: "
+        "карта, Каспи/рассрочка и USDT/BTC. После оплаты доступ открывается "
+        "мгновенно.\n\n"
+        "Если что-то не проходит — нажми «Задать вопрос куратору», и я отмечу "
+        "тебя для ручной помощи.",
+        parse_mode="HTML",
+        reply_markup=course_keyboard(pattern, "payment_help"),
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("ask_curator:"))
+async def cb_ask_curator(cb: types.CallbackQuery):
+    _, pattern_raw, context = cb.data.split(":", 2)
+    pattern = int(pattern_raw)
+    await db_log_event(cb.from_user.id, "asked_curator", {
+        "pattern": pattern,
+        "context": context,
+    }, stage="asked_question")
+    uname = f"@{cb.from_user.username}" if cb.from_user.username else "(нет @username)"
+    name = " ".join(filter(None, [
+        cb.from_user.first_name,
+        cb.from_user.last_name,
+    ])) or "—"
+    await bot.send_message(
+        ADMIN_ID,
+        "💬 <b>Вопрос куратору</b>\n\n"
+        f"Пользователь: {name} {uname}\n"
+        f"TG ID: <code>{cb.from_user.id}</code>\n"
+        f"Паттерн: {pattern}\n"
+        f"Контекст: {context}\n\n"
+        "Напиши ему вручную или ответь через личку.",
+        parse_mode="HTML",
+    )
+    await cb.message.answer(
+        "Я отметил тебя для куратора. Напиши сюда одним сообщением, что именно "
+        "хочешь уточнить: оплата, программа, подходит ли курс, стартовый капитал "
+        "или Crypto OS."
+    )
+    await cb.answer("Куратор увидит запрос")
+
+
 # ─── override ───────────────────────────────────────────────────────────────
 @dp.callback_query(F.data.startswith("override_accept:"))
 async def admin_override_accept(cb: types.CallbackQuery):
@@ -682,6 +1036,7 @@ async def cmd_admin(message: types.Message):
         "<b>Команды:</b>\n"
         "/admin — эта панель\n"
         "/stats — сколько кандидатов по паттернам\n"
+        "/funnel — статусы воронки и клики\n"
         "/export — скачать CSV со всеми кандидатами\n"
         "/broadcast — рассылка всем подписчикам (reply на сообщение)\n"
         "/id — твой Telegram id",
@@ -732,6 +1087,45 @@ async def cmd_stats(message: types.Message):
         c = stats["by_pattern"].get(p, 0)
         emoji = {1: "🔴", 2: "🟠", 3: "🔵", 4: "🟢", 5: "⚡"}[p]
         lines.append(f"{emoji} Паттерн {p}: {c}")
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@dp.message(Command("funnel"))
+async def cmd_funnel(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    stats = await db_funnel_stats()
+    lines = [
+        "🧭 <b>Воронка CI Academy</b>\n",
+        f"Всего пользователей в базе: <b>{stats['users_total']}</b>",
+        f"Кликнули курс: <b>{stats['course_clicked']}</b>",
+        "",
+        "<b>По стадиям:</b>",
+    ]
+    stage_names = {
+        "seen": "увиден ботом",
+        "started": "нажал /start",
+        "intent_selected": "выбрал интерес",
+        "quick_result": "получил быстрый результат",
+        "full_result": "отправил полный результат",
+        "course_info_viewed": "смотрел состав курса",
+        "payment_help_viewed": "смотрел оплату",
+        "course_clicked": "открыл ссылку курса",
+        "asked_question": "попросил куратора",
+    }
+    for stage, count in sorted(stats["by_stage"].items()):
+        lines.append(f"• {stage_names.get(stage, stage)}: <b>{count}</b>")
+
+    lines.append("\n<b>По интересу:</b>")
+    for intent, count in sorted(stats["by_intent"].items()):
+        label = INTENT_LABELS.get(intent, "Не выбрано" if intent == "not_selected" else intent)
+        lines.append(f"• {label}: <b>{count}</b>")
+
+    if stats["events"]:
+        lines.append("\n<b>События:</b>")
+        for event_type, count in sorted(stats["events"].items()):
+            lines.append(f"• {event_type}: <b>{count}</b>")
+
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 

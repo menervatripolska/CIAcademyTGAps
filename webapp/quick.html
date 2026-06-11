@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <meta name="cia-api" content="https://worker-production-772c.up.railway.app">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Быстрая диагностика — CI Academy</title>
+  <link rel="stylesheet" href="css/kryptan.css">
+  <style>
+    .quick-head { padding: 28px 0 16px; }
+    .quick-step { display: none; }
+    .quick-step.active { display: block; }
+    .quick-options { display: grid; gap: 10px; margin-top: 16px; }
+    .quick-result { display: none; }
+    .quick-result.visible { display: block; }
+    .mode-pill {
+      display: inline-flex;
+      padding: 6px 12px;
+      border: 1px solid var(--border-neon);
+      border-radius: 6px;
+      color: var(--neon-green);
+      font-family: var(--font-title);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .score-tile {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 8px;
+      text-align: center;
+      background: rgba(255,255,255,0.025);
+    }
+    .score-tile b {
+      display: block;
+      font-family: var(--font-title);
+      font-size: 1.6rem;
+      color: var(--neon-violet);
+      line-height: 1;
+    }
+    .score-tile span {
+      display: block;
+      margin-top: 4px;
+      font-family: var(--font-body);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .action-list {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .action-list li {
+      padding: 12px 14px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-text);
+      line-height: 1.45;
+      background: rgba(255,255,255,0.02);
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+  <div class="quick-head">
+    <button onclick="window.location.href='index.html'" class="btn btn-outline" style="padding:8px 14px;font-size:0.8rem;margin-bottom:16px;">← Назад</button>
+    <div class="neon-badge green">⚡ 3 минуты</div>
+    <h1 class="ka-title" style="margin-top:12px;">Быстрая диагностика</h1>
+    <p class="ka-subtitle" style="text-align:left;letter-spacing:0;">Определим твой текущий крипто-режим и безопасный следующий шаг.</p>
+  </div>
+
+  <div id="quizWrap"></div>
+
+  <div class="quick-result" id="resultWrap">
+    <div class="ka-card">
+      <div class="mode-pill" id="modePill"></div>
+      <h2 id="resultTitle" style="font-family:var(--font-title);font-size:1.45rem;margin-bottom:10px;"></h2>
+      <p id="resultText" style="font-family:var(--font-text);color:var(--text-secondary);line-height:1.65;"></p>
+      <div class="score-grid">
+        <div class="score-tile"><b id="riskScore"></b><span>Риск</span></div>
+        <div class="score-tile"><b id="systemScore"></b><span>Система</span></div>
+        <div class="score-tile"><b id="actionScore"></b><span>Готовность</span></div>
+      </div>
+      <div class="question-num">Что сделать на этой неделе</div>
+      <ul class="action-list" id="actionList"></ul>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="submitBtn" onclick="submitQuickResult()">
+      📤 Отправить в бот и получить маршрут
+    </button>
+    <button class="btn btn-outline btn-full" onclick="startFullProfile()" style="margin-top:10px;">
+      Пройти полный профиль
+    </button>
+    <p style="font-family:var(--font-text);font-size:0.8rem;color:var(--text-muted);text-align:center;margin-top:10px;">
+      Бот сохранит результат и даст ссылку на подходящий маршрут курса.
+    </p>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script>
+const QUESTIONS = [
+  {
+    text: 'Что сейчас ближе всего к твоей ситуации?',
+    answers: [
+      { text: 'Я новичок и хочу понять, с чего начать', scores: { system: 0, action: 1 }, intent: 'newbie' },
+      { text: 'Уже покупал крипту, но решения хаотичные', scores: { risk: 1, system: 0 }, intent: 'chaos' },
+      { text: 'Хочу DCA/Grid и понятную систему', scores: { system: 2, action: 2 }, intent: 'system' },
+      { text: 'Хочу активнее торговать', scores: { risk: 2, action: 2 }, intent: 'trading' },
+    ],
+  },
+  {
+    text: 'Когда рынок резко падает, ты чаще...',
+    answers: [
+      { text: 'Паникую и хочу всё продать', scores: { risk: 2, system: 0 } },
+      { text: 'Докидываю без плана, чтобы усредниться', scores: { risk: 2, action: 1 } },
+      { text: 'Смотрю на план и лимиты', scores: { system: 2, risk: 0 } },
+      { text: 'Жду, пока появится понятная картина', scores: { system: 1, risk: 0 } },
+    ],
+  },
+  {
+    text: 'Какой у тебя главный стопор?',
+    answers: [
+      { text: 'Не понимаю базу BTC/ETH/SOL', scores: { system: 0, action: 0 } },
+      { text: 'Не знаю, когда покупать', scores: { system: 1, action: 1 } },
+      { text: 'Слишком много сигналов и шума', scores: { risk: 1, system: 0 } },
+      { text: 'Нет дисциплины и правил', scores: { risk: 2, system: 0 } },
+    ],
+  },
+  {
+    text: 'Что тебе больше подходит по времени?',
+    answers: [
+      { text: 'Открывать систему раз в неделю', scores: { system: 2, risk: 0 } },
+      { text: 'Проверять рынок пару раз в день', scores: { action: 2, risk: 1 } },
+      { text: 'Следить постоянно', scores: { action: 2, risk: 2 } },
+      { text: 'Пока хочу только разобраться', scores: { action: 0, system: 1 } },
+    ],
+  },
+  {
+    text: 'Какая цель честнее всего?',
+    answers: [
+      { text: 'Не потерять деньги на старте', scores: { risk: 0, system: 1 } },
+      { text: 'Собрать портфель на цикл', scores: { system: 2, action: 1 } },
+      { text: 'Настроить автоматизацию DCA/Grid', scores: { system: 2, action: 2 } },
+      { text: 'Поймать быстрые сделки', scores: { risk: 2, action: 2 } },
+    ],
+  },
+  {
+    text: 'Если видишь монету, которая уже выросла на 80%, ты...',
+    answers: [
+      { text: 'Захожу, чтобы не упустить', scores: { risk: 2, action: 1 } },
+      { text: 'Ищу подтверждения и риск/прибыль', scores: { system: 2, risk: 0 } },
+      { text: 'Жду откат или пропускаю', scores: { system: 1, risk: 0 } },
+      { text: 'Не понимаю, как оценивать', scores: { system: 0, action: 0 } },
+    ],
+  },
+  {
+    text: 'Какой формат обучения тебе нужен?',
+    answers: [
+      { text: 'Сначала база простым языком', scores: { system: 1, action: 0 } },
+      { text: 'Пошаговая операционная система', scores: { system: 2, action: 1 } },
+      { text: 'Практика с портфелем и ботами', scores: { system: 2, action: 2 } },
+      { text: 'Личный разбор и быстрые решения', scores: { action: 2, risk: 1 } },
+    ],
+  },
+  {
+    text: 'Что будет лучшим результатом через 30 дней?',
+    answers: [
+      { text: 'Я понимаю крипту и не боюсь терминов', scores: { system: 1, action: 0 } },
+      { text: 'У меня есть портфель и правила закупки', scores: { system: 2, action: 1 } },
+      { text: 'У меня настроены DCA/Grid и чек-листы', scores: { system: 2, action: 2 } },
+      { text: 'Я понимаю, можно ли мне активнее торговать', scores: { risk: 1, action: 2 } },
+    ],
+  },
+  {
+    text: 'Как ты относишься к плечам и фьючерсам?',
+    answers: [
+      { text: 'Хочу попробовать как можно быстрее', scores: { risk: 2, action: 2 } },
+      { text: 'Интересно, но страшно', scores: { risk: 1, action: 1 } },
+      { text: 'Только после риск-менеджмента', scores: { system: 2, risk: 0 } },
+      { text: 'Пока не хочу, мне нужен базовый портфель', scores: { system: 1, risk: 0 } },
+    ],
+  },
+  {
+    text: 'Сколько хаоса сейчас в твоих крипто-решениях?',
+    answers: [
+      { text: 'Много, решения почти случайные', scores: { risk: 2, system: 0 } },
+      { text: 'Средне, иногда есть план', scores: { risk: 1, system: 1 } },
+      { text: 'Мало, но хочу усилить систему', scores: { system: 2, action: 1 } },
+      { text: 'Не знаю, ещё не начинал', scores: { system: 0, action: 0 } },
+    ],
+  },
+];
+
+let current = 0;
+let answers = [];
+let quickResult = null;
+
+function renderQuestion() {
+  const wrap = document.getElementById('quizWrap');
+  const q = QUESTIONS[current];
+  wrap.innerHTML = `
+    <div class="ka-card quick-step active">
+      <div class="question-num">Вопрос ${current + 1} из ${QUESTIONS.length}</div>
+      <div class="question-text">${q.text}</div>
+      <div class="quick-options">
+        ${q.answers.map((a, i) => `<button class="option-btn" onclick="selectAnswer(${i})">${a.text}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function selectAnswer(index) {
+  answers[current] = index;
+  if (current < QUESTIONS.length - 1) {
+    current += 1;
+    renderQuestion();
+    window.scrollTo(0, 0);
+    return;
+  }
+  showResult();
+}
+
+function buildResult() {
+  const scores = { risk: 0, system: 0, action: 0 };
+  const intents = {};
+  answers.forEach((answerIndex, qIndex) => {
+    const answer = QUESTIONS[qIndex].answers[answerIndex];
+    Object.entries(answer.scores || {}).forEach(([k, v]) => scores[k] += v);
+    if (answer.intent) intents[answer.intent] = (intents[answer.intent] || 0) + 1;
+  });
+  const intent = Object.entries(intents).sort((a, b) => b[1] - a[1])[0]?.[0] || 'system';
+  let mode;
+  if (scores.risk >= 11 && scores.system <= 8) mode = 'protect';
+  else if (scores.system >= 14 && scores.action >= 10) mode = 'operator';
+  else if (scores.system >= 11) mode = 'navigator';
+  else if (scores.action >= 12) mode = 'trader_check';
+  else mode = 'starter';
+
+  const copy = {
+    starter: {
+      pattern: 2,
+      title: 'Твой режим: безопасный старт',
+      badge: 'STARTER',
+      text: 'Сейчас важнее не скорость, а база: понять BTC/ETH/SOL, не путать инвестиции с азартом и собрать первые правила закупки.',
+      actions: ['Не заходи в фьючерсы до риск-правил.', 'Разбери базу рынка и цикл Bitcoin.', 'Начни с простой DCA-логики вместо случайных покупок.'],
+    },
+    protect: {
+      pattern: 2,
+      title: 'Твой режим: защита от хаоса',
+      badge: 'PROTECT',
+      text: 'Главный риск сейчас — импульсивные решения. Тебе нужна система, которая заранее ограничивает риск и убирает торговлю на эмоциях.',
+      actions: ['Выпиши лимит риска на одну идею.', 'Откажись от плечей до понятного плана.', 'Используй Crypto OS как карту решений, а не сигналы.'],
+    },
+    navigator: {
+      pattern: 3,
+      title: 'Твой режим: навигатор рынка',
+      badge: 'NAVIGATOR',
+      text: 'У тебя уже есть запрос на структуру. Лучший маршрут — портфель, DCA, режим рынка и еженедельная проверка без постоянного мониторинга.',
+      actions: ['Собери watchlist из крупных активов.', 'Определи доли портфеля и правила докупки.', 'Раз в неделю сверяйся с макро-режимом и DCA-планом.'],
+    },
+    operator: {
+      pattern: 4,
+      title: 'Твой режим: оператор системы',
+      badge: 'OPERATOR',
+      text: 'Тебе подходит не хаотичный трейдинг, а операционная система: DCA/Grid, чек-листы, риск-слои и практическая настройка.',
+      actions: ['Настрой правила DCA до первой сделки.', 'Отдели портфельный слой от активных идей.', 'Разбери Grid только после лимитов риска.'],
+    },
+    trader_check: {
+      pattern: 3,
+      title: 'Твой режим: проверка трейдинга',
+      badge: 'CHECK',
+      text: 'Есть тяга к активным решениям, но сначала нужна проверка дисциплины. Без системы рынок будет провоцировать лишние входы.',
+      actions: ['Не увеличивай частоту сделок без журнала.', 'Сначала пройди блок риск-менеджмента.', 'Проверь идеи через чек-лист, а не через FOMO.'],
+    },
+  }[mode];
+
+  return { mode, intent, scores, ...copy };
+}
+
+function showResult() {
+  quickResult = buildResult();
+  document.getElementById('quizWrap').style.display = 'none';
+  document.getElementById('resultWrap').classList.add('visible');
+  document.getElementById('modePill').textContent = quickResult.badge;
+  document.getElementById('resultTitle').textContent = quickResult.title;
+  document.getElementById('resultText').textContent = quickResult.text;
+  document.getElementById('riskScore').textContent = quickResult.scores.risk;
+  document.getElementById('systemScore').textContent = quickResult.scores.system;
+  document.getElementById('actionScore').textContent = quickResult.scores.action;
+  document.getElementById('actionList').innerHTML = quickResult.actions.map(a => `<li>${a}</li>`).join('');
+  Progress.saveTest('quick', quickResult);
+  window.scrollTo(0, 0);
+}
+
+function buildQuickPayload() {
+  return {
+    mode: 'quick',
+    results: {
+      pattern: quickResult.pattern,
+      quick: quickResult,
+    },
+  };
+}
+
+function getApiUrl() {
+  const meta = document.querySelector('meta[name="cia-api"]');
+  return meta && meta.content ? meta.content.replace(/\/+$/, '') : '';
+}
+
+async function submitQuickResult() {
+  if (!quickResult) return;
+  const btn = document.getElementById('submitBtn');
+  const tgWebApp = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  const initData = tgWebApp && tgWebApp.initData ? tgWebApp.initData : '';
+  const apiUrl = getApiUrl();
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Отправляем...';
+
+  if (!apiUrl || !initData) {
+    btn.disabled = false;
+    btn.textContent = !initData ? 'Открой через Telegram-бота' : 'API URL не задан';
+    return;
+  }
+
+  try {
+    const resp = await fetch(apiUrl + '/api/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Telegram-Init-Data': initData,
+      },
+      body: JSON.stringify(buildQuickPayload()),
+    });
+    if (!resp.ok) throw new Error('api_' + resp.status);
+    btn.textContent = '✅ Отправлено. Проверь чат с ботом.';
+    setTimeout(() => { try { tgWebApp.close(); } catch (_) {} }, 1600);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⚠️ Ошибка — попробуй ещё раз';
+    try {
+      if (tgWebApp && tgWebApp.showAlert) tgWebApp.showAlert('Не удалось отправить результат: ' + (e.message || e));
+    } catch (_) {}
+  }
+}
+
+function startFullProfile() {
+  const p = Progress.get();
+  p._started = Date.now();
+  Progress.set(p);
+  window.location.href = 'index.html';
+}
+
+document.addEventListener('DOMContentLoaded', renderQuestion);
+</script>
+</body>
+</html>

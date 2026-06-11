@@ -138,6 +138,40 @@
     }
     .test-row.done .test-row-status { color: var(--neon-green); }
     .test-row:not(.done):not(.locked) .test-row-status { color: var(--neon-purple); }
+    .route-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .route-card {
+      width: 100%;
+      padding: 16px;
+      border: 1px solid var(--border-neon);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-primary);
+      text-align: left;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .route-card:hover {
+      background: rgba(0,212,170,0.08);
+      transform: translateY(-1px);
+    }
+    .route-title {
+      display: block;
+      font-family: var(--font-body);
+      font-weight: 800;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .route-desc {
+      display: block;
+      font-family: var(--font-text);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
   </style>
 </head>
 <body>
@@ -220,17 +254,22 @@
         Прежде чем зайти в курс — короткая диагностика: как ты реагируешь на риск, как держишь неопределённость, что тебе ближе по складу. Это не экзамен, это чтобы понять, в каком режиме работать с тобой на курсе.
       </p>
       <ul class="rules-list">
-        <li data-icon="🧠">Пять коротких методик, по очереди</li>
-        <li data-icon="⚡">Отвечай как есть — внутренняя шкала искажений видит натяжки</li>
-        <li data-icon="🕐">Занимает ~15 минут, можно не спешить</li>
-        <li data-icon="🔒">Следующий тест открывается после предыдущего</li>
-        <li data-icon="🎯">В конце — профиль и рекомендация по режиму обучения</li>
+        <li data-icon="⚡">Быстрый маршрут: 10 вопросов и рекомендация за 3 минуты</li>
+        <li data-icon="🧠">Полный маршрут: пять методик и глубокий профиль</li>
+        <li data-icon="🎯">В конце — режим обучения и понятный следующий шаг</li>
       </ul>
     </div>
 
-    <button class="btn btn-primary btn-full" onclick="startTesting()" style="margin-top:8px;">
-      Начать отбор
-    </button>
+    <div class="route-grid">
+      <button class="route-card" onclick="startQuickDiagnostic()">
+        <span class="route-title">⚡ Быстрая диагностика</span>
+        <span class="route-desc">3 минуты: определить крипто-режим, риски и подходящий вход в Crypto OS.</span>
+      </button>
+      <button class="route-card" onclick="startTesting()">
+        <span class="route-title">🧠 Полный отбор</span>
+        <span class="route-desc">15–20 минут: пройти все 5 тестов и получить глубокий профиль.</span>
+      </button>
+    </div>
 
   </div>
 
@@ -304,6 +343,13 @@ function startTesting() {
     Progress.set(p);
   }
   showDashboard();
+}
+
+function startQuickDiagnostic() {
+  const p = Progress.get();
+  p._quick_started = Date.now();
+  Progress.set(p);
+  window.location.href = 'quick.html';
 }
 
 function showDashboard() {
